@@ -25,7 +25,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "11"
-          cache: maven
 
       - name: Set Up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
