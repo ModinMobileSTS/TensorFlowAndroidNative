@@ -104,6 +104,19 @@ ANDROID_GRAPHCYCLES_PATCH_HUNK = """--- ./absl/synchronization/internal/graphcyc
 """
 
 
+BFLOAT16_CSTDINT_PATCH = """--- a/tensorflow/core/lib/bfloat16/bfloat16.h
++++ b/tensorflow/core/lib/bfloat16/bfloat16.h
+@@ -17,6 +17,7 @@
+ 
+ #include <cmath>
+ #include <complex>
++#include <cstdint>
+ #include <iostream>
+ 
+ #include "tensorflow/core/platform/byte_order.h"
+"""
+
+
 def write_tensorflow_android_absl_patch(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = "".join(
@@ -116,6 +129,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
             tofile="b/third_party/com_google_absl_fix_mac_and_nvcc_build.patch",
         )
     )
+    text += BFLOAT16_CSTDINT_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
