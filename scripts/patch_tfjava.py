@@ -129,6 +129,48 @@ BFLOAT16_CSTDINT_PATCH = """--- a/tensorflow/core/lib/bfloat16/bfloat16.h
 """
 
 
+LLVM_ANDROID_CONFIG_PATCH = """--- a/third_party/llvm/llvm.bzl
++++ b/third_party/llvm/llvm.bzl
+@@ -248,6 +248,13 @@ linux_cmake_vars = {
+     "HAVE_FUTIMENS": 1,
+ }
+ 
++android_cmake_vars = {
++    "HAVE_BACKTRACE": 0,
++    "HAVE_EXECINFO_H": 0,
++    "HAVE_LIBPTHREAD": 0,
++    "HAVE__UNWIND_BACKTRACE": 0,
++}
++
+ # CMake variables specific to the FreeBSD platform
+ freebsd_cmake_vars = {
+     "HAVE_MALLOC_H": 1,
+@@ -311,6 +319,14 @@ llvm_all_cmake_vars = select({
+             darwin_cmake_vars,
+         ),
+     ),
++    "@org_tensorflow//tensorflow:android": cmake_var_string(
++        _dict_add(
++            cmake_vars,
++            llvm_target_cmake_vars("AArch64", "aarch64-unknown-linux-android"),
++            posix_cmake_vars,
++            android_cmake_vars,
++        ),
++    ),
+     "@org_tensorflow//tensorflow:linux_ppc64le": cmake_var_string(
+         _dict_add(
+             cmake_vars,
+@@ -344,6 +360,7 @@ llvm_all_cmake_vars = select({
+ 
+ llvm_linkopts = select({
+     "@org_tensorflow//tensorflow:windows": [],
++    "@org_tensorflow//tensorflow:android": ["-ldl", "-lm"],
+     "@org_tensorflow//tensorflow:freebsd": ["-ldl", "-lm", "-lpthread", "-lexecinfo"],
+     "//conditions:default": ["-ldl", "-lm", "-lpthread"],
+ })
+"""
+
+
 def write_tensorflow_android_absl_patch(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     absl_patch_text = (
@@ -145,6 +187,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
         )
     )
     text += BFLOAT16_CSTDINT_PATCH
+    text += LLVM_ANDROID_CONFIG_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
