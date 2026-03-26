@@ -1,0 +1,117 @@
+name: Build TensorFlow Android ARM64 JNI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      TFJAVA_COMMIT: c065b70c05acefe703fee21a156561e76e54c66d
+      ANDROID_PLATFORM: android-arm64
+      ANDROID_API_LEVEL: "33"
+      ANDROID_NDK_API_LEVEL: "21"
+      ANDROID_NDK_VERSION: 27.3.13750724
+      USE_BAZEL_VERSION: 2.0.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set Up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: maven
+
+      - name: Set Up Bazelisk
+        uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Set Up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android Components
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-${ANDROID_API_LEVEL}" \
+            "build-tools;34.0.0" \
+            "ndk;${ANDROID_NDK_VERSION}"
+
+      - name: Clone TensorFlow Java
+        shell: bash
+        run: |
+          git clone https://github.com/tensorflow/java.git tfjava
+          cd tfjava
+          git checkout "${TFJAVA_COMMIT}"
+
+      - name: Patch TensorFlow Java For Android ARM64
+        shell: bash
+        run: |
+          python3 scripts/patch_tfjava.py tfjava
+
+      - name: Show Patched Snippets
+        shell: bash
+        run: |
+          cd tfjava
+          sed -n '1,120p' tensorflow-core/tensorflow-core-api/build.sh
+          echo '---'
+          grep -n 'PLATFORM>${javacpp.platform}' tensorflow-core/tensorflow-core-api/pom.xml || true
+          echo '---'
+          grep -n 'android-arm64' tensorflow-core/tensorflow-core-api/src/main/java/org/tensorflow/internal/c_api/presets/tensorflow.java || true
+
+      - name: Build Android ARM64 Native Libraries
+        shell: bash
+        run: |
+          set -o pipefail
+          export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+          export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
+          export ANDROID_NDK_ROOT="${ANDROID_NDK_HOME}"
+          export ANDROID_SDK_API_LEVEL="${ANDROID_API_LEVEL}"
+          export ANDROID_NDK_API_LEVEL="${ANDROID_NDK_API_LEVEL}"
+          export JAVA_HOME="${JAVA_HOME_11_X64}"
+          export PATH="${JAVA_HOME}/bin:${PATH}"
+          mkdir -p "${GITHUB_WORKSPACE}/artifacts"
+          cd tfjava
+          mvn -B -e \
+            -DskipTests \
+            -Djavacpp.platform="${ANDROID_PLATFORM}" \
+            -Djavacpp.platform.properties="${ANDROID_PLATFORM}" \
+            -Djavacpp.platform.root="${ANDROID_NDK_HOME}" \
+            -pl tensorflow-core/tensorflow-core-api \
+            -am \
+            package 2>&1 | tee "${GITHUB_WORKSPACE}/artifacts/build.log"
+
+      - name: Collect Artifacts
+        if: always()
+        shell: bash
+        run: |
+          set -e
+          mkdir -p "${GITHUB_WORKSPACE}/artifacts/output"
+          if [ -d tfjava/tensorflow-core/tensorflow-core-api/target/native ]; then
+            cp -R tfjava/tensorflow-core/tensorflow-core-api/target/native/. "${GITHUB_WORKSPACE}/artifacts/output/" || true
+          fi
+          if [ -d tfjava/tensorflow-core/tensorflow-core-api/target ]; then
+            find tfjava/tensorflow-core/tensorflow-core-api/target -maxdepth 1 -type f \( -name '*.jar' -o -name '*.pom' \) -exec cp {} "${GITHUB_WORKSPACE}/artifacts/output/" \; || true
+          fi
+          if [ -f "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libjnitensorflow.so" ]; then
+            cp "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libjnitensorflow.so" \
+              "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libtensorflow_jni.so"
+          fi
+          find "${GITHUB_WORKSPACE}/artifacts" -maxdepth 5 -type f | sort > "${GITHUB_WORKSPACE}/artifacts/manifest.txt"
+          if [ -d "${GITHUB_WORKSPACE}/artifacts/output" ]; then
+            (cd "${GITHUB_WORKSPACE}/artifacts/output" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "${GITHUB_WORKSPACE}/artifacts/sha256.txt" || true
+          fi
+
+      - name: Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tensorflow-android-arm64-build
+          path: artifacts
+          if-no-files-found: warn
