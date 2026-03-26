@@ -104,6 +104,18 @@ ANDROID_GRAPHCYCLES_PATCH_HUNK = """--- ./absl/synchronization/internal/graphcyc
 """
 
 
+ABSL_EXTENSION_CSTDINT_PATCH_HUNK = """--- ./absl/strings/internal/str_format/extension.h\t2019-09-23 13:20:52.000000000 -0700
++++ ./absl/strings/internal/str_format/extension.h.fixed\t2019-09-23 13:20:48.000000000 -0700
+@@ -17,6 +17,7 @@
+ 
+ #include <limits.h>
++#include <cstdint>
+ #include <cstddef>
+ #include <cstring>
+ #include <ostream>
+"""
+
+
 BFLOAT16_CSTDINT_PATCH = """--- a/tensorflow/core/lib/bfloat16/bfloat16.h
 +++ b/tensorflow/core/lib/bfloat16/bfloat16.h
 @@ -17,6 +17,7 @@
@@ -119,12 +131,15 @@ BFLOAT16_CSTDINT_PATCH = """--- a/tensorflow/core/lib/bfloat16/bfloat16.h
 
 def write_tensorflow_android_absl_patch(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    absl_patch_text = (
+        ORIGINAL_TENSORFLOW_ABSL_PATCH
+        + ANDROID_GRAPHCYCLES_PATCH_HUNK
+        + ABSL_EXTENSION_CSTDINT_PATCH_HUNK
+    )
     text = "".join(
         difflib.unified_diff(
             ORIGINAL_TENSORFLOW_ABSL_PATCH.splitlines(keepends=True),
-            (ORIGINAL_TENSORFLOW_ABSL_PATCH + ANDROID_GRAPHCYCLES_PATCH_HUNK).splitlines(
-                keepends=True
-            ),
+            absl_patch_text.splitlines(keepends=True),
             fromfile="a/third_party/com_google_absl_fix_mac_and_nvcc_build.patch",
             tofile="b/third_party/com_google_absl_fix_mac_and_nvcc_build.patch",
         )
