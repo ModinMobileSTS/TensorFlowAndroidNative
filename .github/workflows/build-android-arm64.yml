@@ -20,12 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set Up Java 11
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "11"
-
       - name: Set Up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
 
@@ -41,6 +35,12 @@ jobs:
             "platforms;android-${ANDROID_API_LEVEL}" \
             "build-tools;34.0.0" \
             "ndk;${ANDROID_NDK_VERSION}"
+
+      - name: Set Up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
 
       - name: Clone TensorFlow Java
         shell: bash
