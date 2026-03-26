@@ -251,9 +251,9 @@ TFE_C_API_ANDROID_DEPS_PATCH = """--- a/tensorflow/c/eager/BUILD
 EAGER_CONTEXT_ANDROID_DEPS_PATCH = """--- a/tensorflow/core/common_runtime/eager/BUILD
 +++ b/tensorflow/core/common_runtime/eager/BUILD
 @@ -55,14 +55,14 @@
-        ":eager_executor",
-        ":kernel_and_device",
-        ":process_function_library_runtime",
+         ":eager_executor",
+         ":kernel_and_device",
+         ":process_function_library_runtime",
 -        "//tensorflow/core/distributed_runtime/eager:remote_tensor_handle",
 -        "//tensorflow/core/distributed_runtime:rendezvous_mgr_interface",
 -        "//tensorflow/core/distributed_runtime:worker_env",
