@@ -40,11 +40,22 @@ def patch_preset(path: Path) -> None:
 
 def patch_workspace(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
-    if "android_ndk_repository(" in text or "android_sdk_repository(" in text:
-        return
-    old = 'bazel_version_repository(name = "bazel_version")\n'
-    new = """bazel_version_repository(name = "bazel_version")\n\nandroid_sdk_repository(\n    name = "androidsdk",\n    api_level = 29,\n    build_tools_version = "29.0.3",\n)\n\nandroid_ndk_repository(\n    name = "androidndk",\n    api_level = 21,\n)\n"""
-    text = replace_once(text, old, new, path)
+    if ':tensorflow-android-absl.patch",' not in text:
+        old = '        ":tensorflow-proto.patch",\n'
+        new = """        ":tensorflow-proto.patch",\n        ":tensorflow-android-absl.patch",\n"""
+        text = replace_once(text, old, new, path)
+    if "android_ndk_repository(" not in text and "android_sdk_repository(" not in text:
+        old = 'bazel_version_repository(name = "bazel_version")\n'
+        new = """bazel_version_repository(name = "bazel_version")\n\nandroid_sdk_repository(\n    name = "androidsdk",\n    api_level = 29,\n    build_tools_version = "29.0.3",\n)\n\nandroid_ndk_repository(\n    name = "androidndk",\n    api_level = 21,\n)\n"""
+        text = replace_once(text, old, new, path)
+    path.write_text(text, encoding="utf-8")
+
+
+def write_tensorflow_android_absl_patch(path: Path) -> None:
+    text = """diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
+--- a/tensorflow/workspace.bzl
++++ b/tensorflow/workspace.bzl
+@@ -186,7 +186,8 @@ def tf_workspace(path_prefix = \"\", tf_repo_name = \"\"):\n     tf_http_archive(\n         name = \"com_google_absl\",\n         build_file = clean_dep(\"//third_party:com_google_absl.BUILD\"),\n         # TODO: Remove the patch when https://github.com/abseil/abseil-cpp/issues/326 is resolved\n         # and when TensorFlow is build against CUDA 10.2\n -        patch_file = clean_dep(\"//third_party:com_google_absl_fix_mac_and_nvcc_build.patch\"),\n +        patch_file = clean_dep(\"//third_party:com_google_absl_fix_mac_and_nvcc_build.patch\"),\n +        patch_cmds = [\"grep -q '^#include <limits>$' absl/synchronization/internal/graphcycles.cc || sed -i '/#include <algorithm>/a #include <limits>' absl/synchronization/internal/graphcycles.cc\"],\n         sha256 = \"acd93f6baaedc4414ebd08b33bebca7c7a46888916101d8c0b8083573526d070\",  # SHARED_ABSL_SHA\n         strip_prefix = \"abseil-cpp-43ef2148c0936ebf7cb4be6b19927a9d9d145b8f\",\n         urls = [\n"""
     path.write_text(text, encoding="utf-8")
 
 
@@ -55,6 +66,9 @@ def main() -> None:
     patch_module_pom(root / "tensorflow-core" / "tensorflow-core-api" / "pom.xml")
     patch_build_sh(root / "tensorflow-core" / "tensorflow-core-api" / "build.sh")
     patch_workspace(root / "tensorflow-core" / "tensorflow-core-api" / "WORKSPACE")
+    write_tensorflow_android_absl_patch(
+        root / "tensorflow-core" / "tensorflow-core-api" / "tensorflow-android-absl.patch"
+    )
     patch_preset(
         root
         / "tensorflow-core"
