@@ -87,6 +87,7 @@ jobs:
           cat tensorflow-core/tensorflow-core-api/.tf_configure.bazelrc
 
       - name: Build Android ARM64 Native Libraries
+        id: build_android
         shell: bash
         run: |
           set -o pipefail
@@ -113,6 +114,62 @@ jobs:
             -pl tensorflow-core/tensorflow-core-api \
             -am \
             package 2>&1 | tee "${GITHUB_WORKSPACE}/artifacts/build.log"
+
+      - name: Summarize First Build Failure
+        if: failure() && steps.build_android.outcome == 'failure'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          log_path = Path("artifacts/build.log")
+          if not log_path.exists():
+              print("::error::build.log was not produced")
+              raise SystemExit(0)
+
+          lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+          patterns = [
+              re.compile(r"^(ERROR: .+)$"),
+              re.compile(r"^(FAILED: .+)$"),
+              re.compile(r"^(.+?:\d+(?::\d+)?: (?:fatal )?error: .+)$"),
+              re.compile(r"^(.+?UnsatisfiedLinkError.+)$"),
+              re.compile(r"^(.+?NoSuch.+)$"),
+          ]
+
+          skip = (
+              "Failed to execute goal org.bytedeco:javacpp",
+              "Execution javacpp-build of goal",
+              "Process exited with an error: 1",
+              "BUILD FAILURE",
+          )
+
+          hit = None
+          for i, line in enumerate(lines):
+              if any(token in line for token in skip):
+                  continue
+              if any(p.search(line) for p in patterns):
+                  hit = i
+                  break
+
+          if hit is None:
+              hit = max(0, len(lines) - 80)
+
+          start = max(0, hit - 8)
+          end = min(len(lines), hit + 20)
+          snippet = "\n".join(lines[start:end]).strip()
+          if not snippet:
+              snippet = "\n".join(lines[-40:]).strip()
+
+          summary_path = Path("artifacts/first_failure_summary.txt")
+          summary_path.write_text(snippet + "\n", encoding="utf-8")
+
+          headline = lines[hit].strip() if lines else "Build failed without captured output"
+          headline = headline.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          print(f"::error::{headline[:400]}")
+          print("First failure summary:")
+          print(snippet)
+          PY
 
       - name: Collect Artifacts
         if: always()
