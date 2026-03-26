@@ -52,6 +52,7 @@ def patch_workspace(path: Path) -> None:
 
 
 def write_tensorflow_android_absl_patch(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     text = """diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
 --- a/tensorflow/workspace.bzl
 +++ b/tensorflow/workspace.bzl
@@ -67,7 +68,11 @@ def main() -> None:
     patch_build_sh(root / "tensorflow-core" / "tensorflow-core-api" / "build.sh")
     patch_workspace(root / "tensorflow-core" / "tensorflow-core-api" / "WORKSPACE")
     write_tensorflow_android_absl_patch(
-        root / "tensorflow-core" / "tensorflow-core-api" / "tensorflow-android-absl.patch"
+        root
+        / "tensorflow-core"
+        / "tensorflow-core-api"
+        / "external"
+        / "tensorflow-android-absl.patch"
     )
     patch_preset(
         root
