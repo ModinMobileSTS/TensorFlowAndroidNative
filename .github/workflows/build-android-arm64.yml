@@ -58,11 +58,13 @@ jobs:
         shell: bash
         run: |
           cat > tfjava/tensorflow-core/tensorflow-core-api/.tf_configure.bazelrc <<EOF
+          build --action_env=ANDROID_HOME=${ANDROID_SDK_ROOT}
           build --action_env=ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}
           build --action_env=ANDROID_NDK_API_LEVEL=${ANDROID_NDK_API_LEVEL}
           build --action_env=ANDROID_SDK_HOME=${ANDROID_SDK_ROOT}
           build --action_env=ANDROID_SDK_API_LEVEL=${ANDROID_API_LEVEL}
           build --action_env=ANDROID_BUILD_TOOLS_VERSION=${ANDROID_BUILD_TOOLS_VERSION}
+          build --repo_env=ANDROID_HOME=${ANDROID_SDK_ROOT}
           build --repo_env=ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}
           build --repo_env=ANDROID_NDK_API_LEVEL=${ANDROID_NDK_API_LEVEL}
           build --repo_env=ANDROID_SDK_HOME=${ANDROID_SDK_ROOT}
@@ -78,6 +80,8 @@ jobs:
           echo '---'
           grep -n 'PLATFORM>${javacpp.platform}' tensorflow-core/tensorflow-core-api/pom.xml || true
           echo '---'
+          grep -n 'androidndk\\|androidsdk' tensorflow-core/tensorflow-core-api/WORKSPACE || true
+          echo '---'
           grep -n 'android-arm64' tensorflow-core/tensorflow-core-api/src/main/java/org/tensorflow/internal/c_api/presets/tensorflow.java || true
           echo '---'
           cat tensorflow-core/tensorflow-core-api/.tf_configure.bazelrc
@@ -87,6 +91,7 @@ jobs:
         run: |
           set -o pipefail
           export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+          export ANDROID_SDK_HOME="${ANDROID_SDK_ROOT}"
           export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
           export ANDROID_NDK_ROOT="${ANDROID_NDK_HOME}"
           export ANDROID_SDK_API_LEVEL="${ANDROID_API_LEVEL}"
