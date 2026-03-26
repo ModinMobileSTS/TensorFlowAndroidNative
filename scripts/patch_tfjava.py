@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import sys
 from pathlib import Path
 
@@ -51,12 +52,72 @@ def patch_workspace(path: Path) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+ORIGINAL_TENSORFLOW_ABSL_PATCH = """--- ./absl/time/internal/cctz/BUILD.bazel\t2019-09-23 13:20:52.000000000 -0700
++++ ./absl/time/internal/cctz/BUILD.bazel.fixed\t2019-09-23 13:20:48.000000000 -0700
+@@ -76,15 +76,6 @@
+         "include/cctz/time_zone.h",
+         "include/cctz/zone_info_source.h",
+     ],
+-    linkopts = select({
+-        ":osx": [
+-            "-framework Foundation",
+-        ],
+-        ":ios": [
+-            "-framework Foundation",
+-        ],
+-        "//conditions:default": [],
+-    }),
+     visibility = ["//visibility:public"],
+     deps = [":civil_time"],
+ )
+--- ./absl/strings/string_view.h\t2019-09-23 13:20:52.000000000 -0700
++++ ./absl/strings/string_view.h.fixed\t2019-09-23 13:20:48.000000000 -0700
+@@ -492,7 +492,14 @@
+       (std::numeric_limits<difference_type>::max)();
+ 
+   static constexpr size_type CheckLengthInternal(size_type len) {
++#if defined(__NVCC__) && (__CUDACC_VER_MAJOR__<10 || (__CUDACC_VER_MAJOR__==10 && __CUDACC_VER_MINOR__<2)) && !defined(NDEBUG)
++    // An nvcc bug treats the original return expression as a non-constant,
++    // which is not allowed in a constexpr function. This only happens when
++    // NDEBUG is not defined. This will be fixed in the CUDA 10.2 release.
++    return len;
++#else
+     return ABSL_ASSERT(len <= kMaxSize), len;
++#endif
+   }
+ 
+   const char* ptr_;
+"""
+
+
+ANDROID_GRAPHCYCLES_PATCH_HUNK = """--- ./absl/synchronization/internal/graphcycles.cc\t2019-09-23 13:20:52.000000000 -0700
++++ ./absl/synchronization/internal/graphcycles.cc.fixed\t2019-09-23 13:20:48.000000000 -0700
+@@ -35,6 +35,7 @@
+ #include "absl/synchronization/internal/graphcycles.h"
+ 
+ #include <algorithm>
+ #include <array>
++#include <limits>
+ #include "absl/base/internal/hide_ptr.h"
+ #include "absl/base/internal/raw_logging.h"
+ #include "absl/base/internal/spinlock.h"
+"""
+
+
 def write_tensorflow_android_absl_patch(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = """diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
---- a/tensorflow/workspace.bzl
-+++ b/tensorflow/workspace.bzl
-@@ -186,7 +186,8 @@ def tf_workspace(path_prefix = \"\", tf_repo_name = \"\"):\n     tf_http_archive(\n         name = \"com_google_absl\",\n         build_file = clean_dep(\"//third_party:com_google_absl.BUILD\"),\n         # TODO: Remove the patch when https://github.com/abseil/abseil-cpp/issues/326 is resolved\n         # and when TensorFlow is build against CUDA 10.2\n-        patch_file = clean_dep(\"//third_party:com_google_absl_fix_mac_and_nvcc_build.patch\"),\n+        patch_file = clean_dep(\"//third_party:com_google_absl_fix_mac_and_nvcc_build.patch\"),\n+        patch_cmds = [\"grep -q '^#include <limits>$' absl/synchronization/internal/graphcycles.cc || sed -i '/#include <algorithm>/a #include <limits>' absl/synchronization/internal/graphcycles.cc\"],\n         sha256 = \"acd93f6baaedc4414ebd08b33bebca7c7a46888916101d8c0b8083573526d070\",  # SHARED_ABSL_SHA\n         strip_prefix = \"abseil-cpp-43ef2148c0936ebf7cb4be6b19927a9d9d145b8f\",\n         urls = [\n"""
+    text = "".join(
+        difflib.unified_diff(
+            ORIGINAL_TENSORFLOW_ABSL_PATCH.splitlines(keepends=True),
+            (ORIGINAL_TENSORFLOW_ABSL_PATCH + ANDROID_GRAPHCYCLES_PATCH_HUNK).splitlines(
+                keepends=True
+            ),
+            fromfile="a/third_party/com_google_absl_fix_mac_and_nvcc_build.patch",
+            tofile="b/third_party/com_google_absl_fix_mac_and_nvcc_build.patch",
+        )
+    )
+    if not text.endswith("\n"):
+        text += "\n"
     path.write_text(text, encoding="utf-8")
 
 
