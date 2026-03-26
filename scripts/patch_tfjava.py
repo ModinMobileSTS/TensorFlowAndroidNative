@@ -171,6 +171,111 @@ LLVM_ANDROID_CONFIG_PATCH = """--- a/third_party/llvm/llvm.bzl
 """
 
 
+TFE_C_API_ANDROID_DEPS_PATCH = """--- a/tensorflow/c/eager/BUILD
++++ b/tensorflow/c/eager/BUILD
+@@ -73,20 +73,24 @@
+     }) + [
+         "@com_google_absl//absl/memory",
+         "//tensorflow/core/common_runtime/eager:eager_operation",
+-        "//tensorflow/core/distributed_runtime/eager:remote_mgr",
+-        "//tensorflow/core/distributed_runtime/eager:cluster_function_library_runtime",
+-        "//tensorflow/core/distributed_runtime/eager:eager_client",
+-        "//tensorflow/core/distributed_runtime/rpc/eager:grpc_eager_client",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_channel",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_server_lib",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_worker_cache",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_worker_service",
+-        "//tensorflow/core/distributed_runtime/rpc:rpc_rendezvous_mgr",
+-        "//tensorflow/core/distributed_runtime:remote_device",
+-        "//tensorflow/core/distributed_runtime:server_lib",
+-        "//tensorflow/core/distributed_runtime:worker_env",
+         "//tensorflow/core:gpu_runtime",
+-    ],
++    ] + select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "//tensorflow/core/distributed_runtime/eager:remote_mgr",
++            "//tensorflow/core/distributed_runtime/eager:cluster_function_library_runtime",
++            "//tensorflow/core/distributed_runtime/eager:eager_client",
++            "//tensorflow/core/distributed_runtime/rpc/eager:grpc_eager_client",
++            "//tensorflow/core/distributed_runtime/rpc:grpc_channel",
++            "//tensorflow/core/distributed_runtime/rpc:grpc_server_lib",
++            "//tensorflow/core/distributed_runtime/rpc:grpc_worker_cache",
++            "//tensorflow/core/distributed_runtime/rpc:grpc_worker_service",
++            "//tensorflow/core/distributed_runtime/rpc:rpc_rendezvous_mgr",
++            "//tensorflow/core/distributed_runtime:remote_device",
++            "//tensorflow/core/distributed_runtime:server_lib",
++            "//tensorflow/core/distributed_runtime:worker_env",
++        ],
++    }),
+     alwayslink = 1,
+ )
+ 
+@@ -254,18 +258,22 @@
+         "@com_google_absl//absl/memory",
+         "//tensorflow/c:tf_status_helper",
+         "//tensorflow/core/common_runtime/eager:eager_operation",
+-        "//tensorflow/core/distributed_runtime/eager:eager_client",
+-        "//tensorflow/core/distributed_runtime/rpc/eager:grpc_eager_client",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_channel",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_server_lib",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_worker_cache",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_worker_service",
+-        "//tensorflow/core/distributed_runtime/rpc:rpc_rendezvous_mgr",
+-        "//tensorflow/core/distributed_runtime:remote_device",
+-        "//tensorflow/core/distributed_runtime:server_lib",
+-        "//tensorflow/core/distributed_runtime:worker_env",
+         "//tensorflow/core:gpu_runtime",
+-    ],
++    ] + select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "//tensorflow/core/distributed_runtime/eager:eager_client",
++            "//tensorflow/core/distributed_runtime/rpc/eager:grpc_eager_client",
++            "//tensorflow/core/distributed_runtime/rpc:grpc_channel",
++            "//tensorflow/core/distributed_runtime/rpc:grpc_server_lib",
++            "//tensorflow/core/distributed_runtime/rpc:grpc_worker_cache",
++            "//tensorflow/core/distributed_runtime/rpc:grpc_worker_service",
++            "//tensorflow/core/distributed_runtime/rpc:rpc_rendezvous_mgr",
++            "//tensorflow/core/distributed_runtime:remote_device",
++            "//tensorflow/core/distributed_runtime:server_lib",
++            "//tensorflow/core/distributed_runtime:worker_env",
++        ],
++    }),
+     alwayslink = 1,
+ )
+ 
+"""
+
+
+EAGER_CONTEXT_ANDROID_DEPS_PATCH = """--- a/tensorflow/core/common_runtime/eager/BUILD
++++ b/tensorflow/core/common_runtime/eager/BUILD
+@@ -55,14 +55,14 @@
+        ":eager_executor",
+        ":kernel_and_device",
+        ":process_function_library_runtime",
+-        "//tensorflow/core/distributed_runtime/eager:remote_tensor_handle",
+-        "//tensorflow/core/distributed_runtime:rendezvous_mgr_interface",
+-        "//tensorflow/core/distributed_runtime:worker_env",
+-    ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
+-        "//conditions:default": [
++    ] + select({
++        "//tensorflow:android": [
++            "//tensorflow/core:android_tensorflow_lib_lite",
++        ],
++        "//conditions:default": [
++            "//tensorflow/core/distributed_runtime/eager:remote_tensor_handle",
++            "//tensorflow/core/distributed_runtime:rendezvous_mgr_interface",
++            "//tensorflow/core/distributed_runtime:worker_env",
+             "//tensorflow/core:core_cpu_lib",
+             "//tensorflow/core:framework",
+             "//tensorflow/core:framework_internal",
+"""
+
+
 def write_tensorflow_android_absl_patch(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     absl_patch_text = (
@@ -188,6 +293,8 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     )
     text += BFLOAT16_CSTDINT_PATCH
     text += LLVM_ANDROID_CONFIG_PATCH
+    text += TFE_C_API_ANDROID_DEPS_PATCH
+    text += EAGER_CONTEXT_ANDROID_DEPS_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
