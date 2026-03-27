@@ -41,7 +41,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "11"
-          cache: maven
 
       - name: Restore Bazel caches
         uses: actions/cache@v4
@@ -53,6 +52,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
             ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-
+
+      - name: Restore Maven repository cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.m2/repository
+          key: ${{ runner.os }}-m2-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py', '.github/workflows/build-android-arm64.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-${{ env.TFJAVA_COMMIT }}-
+            ${{ runner.os }}-m2-
 
       - name: Clone TensorFlow Java
         shell: bash
