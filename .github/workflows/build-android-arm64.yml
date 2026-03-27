@@ -41,6 +41,18 @@ jobs:
         with:
           distribution: temurin
           java-version: "11"
+          cache: maven
+
+      - name: Restore Bazel caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.bazel-cache/repository
+            ${{ github.workspace }}/.bazel-cache/disk
+          key: ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py', '.github/workflows/build-android-arm64.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
+            ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-
 
       - name: Clone TensorFlow Java
         shell: bash
@@ -102,6 +114,9 @@ jobs:
           export LANG="C.UTF-8"
           export LC_ALL="C.UTF-8"
           export PATH="${JAVA_HOME}/bin:${PATH}"
+          export BAZEL_REPOSITORY_CACHE="${GITHUB_WORKSPACE}/.bazel-cache/repository"
+          export BAZEL_DISK_CACHE="${GITHUB_WORKSPACE}/.bazel-cache/disk"
+          mkdir -p "${BAZEL_REPOSITORY_CACHE}" "${BAZEL_DISK_CACHE}"
           mkdir -p "${GITHUB_WORKSPACE}/artifacts"
           cd tfjava
           mvn -B -e \
