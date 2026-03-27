@@ -350,6 +350,38 @@ TF_C_API_EXPERIMENTAL_CC_PATCH = """--- a/tensorflow/c/c_api_experimental.cc
 """
 
 
+SAVED_MODEL_ANDROID_DEPS_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
++++ b/tensorflow/cc/saved_model/BUILD
+@@ -50,6 +50,8 @@
+         # tf_lib depending on the build platform.
+         "//tensorflow/core:lib",
+         "//tensorflow/core:protos_all_cc",
++    ]) + if_android([
++        "//tensorflow/core:android_tensorflow_lib",
+     ]),
+ )
+ 
+@@ -98,6 +100,8 @@
+         "//tensorflow/core:core_cpu",
+         "//tensorflow/core:lib",
+         "//tensorflow/core:protos_all_cc",
++    ]) + if_android([
++        "//tensorflow/core:android_tensorflow_lib",
+     ]),
+ )
+ 
+@@ -115,6 +119,8 @@
+         "//tensorflow/core:lib_internal",
+         "//tensorflow/core:protos_all_cc",
+         "//tensorflow/core/util/tensor_bundle:naming",
++    ]) + if_android([
++        "//tensorflow/core:android_tensorflow_lib",
+     ]),
+     alwayslink = 1,
+ )
+"""
+
+
 def write_tensorflow_android_absl_patch(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     absl_patch_text = (
@@ -371,6 +403,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += EAGER_CONTEXT_ANDROID_DEPS_PATCH
     text += TF_C_API_EXPERIMENTAL_BUILD_PATCH
     text += TF_C_API_EXPERIMENTAL_CC_PATCH
+    text += SAVED_MODEL_ANDROID_DEPS_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
