@@ -130,11 +130,11 @@ jobs:
 
           lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
           patterns = [
-              re.compile(r"^(ERROR: .+)$"),
-              re.compile(r"^(FAILED: .+)$"),
               re.compile(r"^(.+?:\d+(?::\d+)?: (?:fatal )?error: .+)$"),
               re.compile(r"^(.+?UnsatisfiedLinkError.+)$"),
               re.compile(r"^(.+?NoSuch.+)$"),
+              re.compile(r"^(ERROR: .+)$"),
+              re.compile(r"^(FAILED: .+)$"),
           ]
 
           skip = (
@@ -142,6 +142,7 @@ jobs:
               "Execution javacpp-build of goal",
               "Process exited with an error: 1",
               "BUILD FAILURE",
+              "compilation of rule",
           )
 
           hit = None

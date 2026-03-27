@@ -250,7 +250,7 @@ TFE_C_API_ANDROID_DEPS_PATCH = """--- a/tensorflow/c/eager/BUILD
 
 EAGER_CONTEXT_ANDROID_DEPS_PATCH = """--- a/tensorflow/core/common_runtime/eager/BUILD
 +++ b/tensorflow/core/common_runtime/eager/BUILD
-@@ -55,14 +55,14 @@
+@@ -55,27 +55,27 @@
          ":eager_executor",
          ":kernel_and_device",
          ":process_function_library_runtime",
@@ -273,6 +273,80 @@ EAGER_CONTEXT_ANDROID_DEPS_PATCH = """--- a/tensorflow/core/common_runtime/eager
              "//tensorflow/core:core_cpu_lib",
              "//tensorflow/core:framework",
              "//tensorflow/core:framework_internal",
+             "//tensorflow/core:lib",
+             "//tensorflow/core:lib_internal",
+             "//tensorflow/core:protos_all_cc",
+             "//tensorflow/core:session_options",
+             "//tensorflow/core/distributed_runtime:collective_param_resolver_distributed",
+             "//tensorflow/core/distributed_runtime:device_resolver_distributed",
+             "//tensorflow/core/distributed_runtime:rpc_collective_executor_mgr",
+             "//tensorflow/core/distributed_runtime:worker_cache",
+             "//tensorflow/core/distributed_runtime:server_lib",
+             "//tensorflow/core/distributed_runtime:worker_session",
+             "//tensorflow/core/distributed_runtime/eager:eager_client",
+         ],
+     }),
+"""
+
+
+TF_C_API_EXPERIMENTAL_BUILD_PATCH = """--- a/tensorflow/c/BUILD
++++ b/tensorflow/c/BUILD
+@@ -315,10 +315,14 @@
+         "//tensorflow/core:protos_all_cc",
+         "//tensorflow/core/common_runtime/eager:attr_builder",
+         "//tensorflow/core/common_runtime/eager:context",
+-        "//tensorflow/core/distributed_runtime/rpc:grpc_server_lib",
+         "//tensorflow/core/platform",
+         "@com_google_absl//absl/strings",
+-    ],
++    ] + select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "//tensorflow/core/distributed_runtime/rpc:grpc_server_lib",
++        ],
++    }),
+     alwayslink = 1,
+ )
+ 
+"""
+
+
+TF_C_API_EXPERIMENTAL_CC_PATCH = """--- a/tensorflow/c/c_api_experimental.cc
++++ b/tensorflow/c/c_api_experimental.cc
+@@ -24,7 +24,10 @@
+ #include "tensorflow/compiler/jit/flags.h"
+ #include "tensorflow/core/common_runtime/eager/attr_builder.h"
+ #include "tensorflow/core/common_runtime/eager/context.h"
++#include "tensorflow/core/platform/platform.h"
++#if !defined(IS_MOBILE_PLATFORM)
+ #include "tensorflow/core/distributed_runtime/rpc/grpc_server_lib.h"
++#endif  // !IS_MOBILE_PLATFORM
+ #include "tensorflow/core/framework/node_def.pb.h"
+ #include "tensorflow/core/framework/shape_inference.h"
+ #include "tensorflow/core/framework/tensor.pb.h"
+@@ -687,6 +690,7 @@
+ }
+ 
+ namespace {
++#if !defined(IS_MOBILE_PLATFORM)
+ tensorflow::Status EnableCollectiveOps(const tensorflow::ServerDef& server_def,
+                                        TFE_Context* ctx) {
+   // We don't use the TF_RETURN_IF_ERROR macro directly since that destroys the
+@@ -728,6 +732,14 @@
+   return tensorflow::Status::OK();
+ #undef LOG_AND_RETURN_IF_ERROR
+ }
++#else
++
++tensorflow::Status EnableCollectiveOps(const tensorflow::ServerDef& server_def,
++                                       TFE_Context* ctx) {
++  return tensorflow::errors::Unimplemented(
++      "TFE_EnableCollectiveOps is not supported on mobile builds.");
++}
++#endif  // !IS_MOBILE_PLATFORM
+ }  // namespace
+ 
+ // Set server_def on the context, possibly updating it.
 """
 
 
@@ -295,6 +369,8 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += LLVM_ANDROID_CONFIG_PATCH
     text += TFE_C_API_ANDROID_DEPS_PATCH
     text += EAGER_CONTEXT_ANDROID_DEPS_PATCH
+    text += TF_C_API_EXPERIMENTAL_BUILD_PATCH
+    text += TF_C_API_EXPERIMENTAL_CC_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
