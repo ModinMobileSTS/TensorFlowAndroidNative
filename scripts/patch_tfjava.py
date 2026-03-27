@@ -350,34 +350,44 @@ TF_C_API_EXPERIMENTAL_CC_PATCH = """--- a/tensorflow/c/c_api_experimental.cc
 """
 
 
-SAVED_MODEL_ANDROID_DEPS_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
+SAVED_MODEL_ANDROID_LOADER_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
 +++ b/tensorflow/cc/saved_model/BUILD
-@@ -50,6 +50,8 @@
-         # tf_lib depending on the build platform.
-         "//tensorflow/core:lib",
-         "//tensorflow/core:protos_all_cc",
-+    ]) + if_android([
-+        "//tensorflow/core:android_tensorflow_lib",
-     ]),
- )
- 
-@@ -98,6 +100,8 @@
+@@ -92,7 +92,7 @@
+ cc_library(
+     name = "loader_lite",
+     hdrs = ["loader.h"],
+-    deps = if_static([
++    deps = if_static_and_not_mobile([
+         ":loader_lite_impl",
+     ]) + if_not_mobile([
          "//tensorflow/core:core_cpu",
-         "//tensorflow/core:lib",
-         "//tensorflow/core:protos_all_cc",
-+    ]) + if_android([
-+        "//tensorflow/core:android_tensorflow_lib",
-     ]),
- )
- 
-@@ -115,6 +119,8 @@
-         "//tensorflow/core:lib_internal",
-         "//tensorflow/core:protos_all_cc",
-         "//tensorflow/core/util/tensor_bundle:naming",
-+    ]) + if_android([
-+        "//tensorflow/core:android_tensorflow_lib",
-     ]),
-     alwayslink = 1,
+"""
+
+
+TENSORFLOW_FRAMEWORK_ANDROID_PATCH = """--- a/tensorflow/BUILD
++++ b/tensorflow/BUILD
+@@ -635,8 +635,12 @@
+     per_os_targets = True,
+     soversion = VERSION,
+     visibility = ["//visibility:public"],
+-    deps = [
+-        "//tensorflow/cc/saved_model:loader_lite_impl",
++    deps = select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "//tensorflow/cc/saved_model:loader_lite_impl",
++        ],
++    }) + [
+         "//tensorflow/core:core_cpu_impl",
+         "//tensorflow/core:framework_internal_impl",
+         "//tensorflow/core:gpu_runtime_impl",
+         "//tensorflow/core/grappler/optimizers:custom_graph_optimizer_registry_impl",
+         "//tensorflow/core:lib_internal_impl",
+         "//tensorflow/core/profiler:profiler_impl",
+         "//tensorflow/stream_executor:stream_executor_impl",
+         "//tensorflow:tf_framework_version_script.lds",
+-    ] + tf_additional_binary_deps(),
++    ] + tf_additional_binary_deps(),
  )
 """
 
@@ -403,7 +413,8 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += EAGER_CONTEXT_ANDROID_DEPS_PATCH
     text += TF_C_API_EXPERIMENTAL_BUILD_PATCH
     text += TF_C_API_EXPERIMENTAL_CC_PATCH
-    text += SAVED_MODEL_ANDROID_DEPS_PATCH
+    text += SAVED_MODEL_ANDROID_LOADER_PATCH
+    text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")

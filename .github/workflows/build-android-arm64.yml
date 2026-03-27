@@ -143,6 +143,7 @@ jobs:
               "Process exited with an error: 1",
               "BUILD FAILURE",
               "compilation of rule",
+              "Linking of rule",
           )
 
           hit = None
