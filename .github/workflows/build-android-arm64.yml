@@ -79,6 +79,16 @@ jobs:
         run: |
           python3 scripts/patch_tfjava.py tfjava
 
+      - name: Vendor Android GNU STL Headers
+        shell: bash
+        run: |
+          set -e
+          STL_ROOT="tfjava/tensorflow-core/tensorflow-core-api/android-gnu-stl"
+          rm -rf "${STL_ROOT}"
+          mkdir -p "${STL_ROOT}/include" "${STL_ROOT}/arm64-v8a/include"
+          cp -R "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}/sources/cxx-stl/gnu-libstdc++/4.9/include/." "${STL_ROOT}/include/"
+          cp -R "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include/." "${STL_ROOT}/arm64-v8a/include/"
+
       - name: Write TensorFlow Configure Overrides
         shell: bash
         run: |
@@ -104,6 +114,8 @@ jobs:
           sed -n '1,120p' tensorflow-core/tensorflow-core-api/build.sh
           echo '---'
           grep -n 'PLATFORM>${javacpp.platform}' tensorflow-core/tensorflow-core-api/pom.xml || true
+          echo '---'
+          grep -n 'android-gnu-stl' tensorflow-core/tensorflow-core-api/pom.xml || true
           echo '---'
           grep -n 'androidndk\\|androidsdk' tensorflow-core/tensorflow-core-api/WORKSPACE || true
           echo '---'
