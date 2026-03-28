@@ -806,6 +806,78 @@ DISTRIBUTED_EAGER_ANDROID_PATCH = """--- a/tensorflow/core/distributed_runtime/e
 """
 
 
+GRPC_SERVER_LIB_ANDROID_BUILD_PATCH = """--- a/tensorflow/core/distributed_runtime/rpc/BUILD
++++ b/tensorflow/core/distributed_runtime/rpc/BUILD
+@@ -312,8 +312,12 @@
+         "//tensorflow/core/distributed_runtime:session_mgr",
+         "//tensorflow/core/distributed_runtime:worker_cache_wrapper",
+         "//tensorflow/core/distributed_runtime:worker_env",
+-        "//tensorflow/core/distributed_runtime/rpc/eager:grpc_eager_service_impl",
+-    ],
++    ] + select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "//tensorflow/core/distributed_runtime/rpc/eager:grpc_eager_service_impl",
++        ],
++    }),
+     alwayslink = 1,
+ )
+ 
+"""
+
+
+GRPC_SERVER_LIB_ANDROID_CC_PATCH = """--- a/tensorflow/core/distributed_runtime/rpc/grpc_server_lib.cc
++++ b/tensorflow/core/distributed_runtime/rpc/grpc_server_lib.cc
+@@ -34,7 +34,9 @@
+ #include "tensorflow/core/distributed_runtime/master_env.h"
+ #include "tensorflow/core/distributed_runtime/master_session.h"
+ #include "tensorflow/core/distributed_runtime/rpc/async_service_interface.h"
++#if !defined(IS_MOBILE_PLATFORM)
+ #include "tensorflow/core/distributed_runtime/rpc/eager/grpc_eager_service_impl.h"
++#endif  // !defined(IS_MOBILE_PLATFORM)
+ #include "tensorflow/core/distributed_runtime/rpc/grpc_channel.h"
+ #include "tensorflow/core/distributed_runtime/rpc/grpc_master_service.h"
+ #include "tensorflow/core/distributed_runtime/rpc/grpc_worker_cache.h"
+@@ -231,7 +233,9 @@
+   worker_service_ = NewGrpcWorkerService(worker_impl_.get(), &builder,
+                                          opts.worker_service_options)
+                         .release();
++#if !defined(IS_MOBILE_PLATFORM)
+   eager_service_ = new eager::GrpcEagerServiceImpl(&worker_env_, &builder);
++#endif  // !defined(IS_MOBILE_PLATFORM)
+ 
+   // extra service:
+   if (opts.service_func != nullptr) {
+@@ -383,9 +387,11 @@
+       worker_thread_.reset(
+           env_->StartThread(ThreadOptions(), "TF_worker_service",
+                             [this] { worker_service_->HandleRPCsLoop(); }));
++#if !defined(IS_MOBILE_PLATFORM)
+       eager_thread_.reset(
+           env_->StartThread(ThreadOptions(), "TF_eager_service",
+                             [this] { eager_service_->HandleRPCsLoop(); }));
++#endif  // !defined(IS_MOBILE_PLATFORM)
+       state_ = STARTED;
+       LOG(INFO) << "Started server with target: " << target();
+       return Status::OK();
+@@ -402,9 +408,14 @@
+ 
+ Status GrpcServer::AddMasterEagerContextToEagerService(
+     const tensorflow::uint64 context_id, tensorflow::EagerContext* context) {
++#if defined(IS_MOBILE_PLATFORM)
++  return errors::Unimplemented(
++      "GRPC eager service is not supported on mobile builds.");
++#else
+   auto* eager_service =
+       static_cast<eager::GrpcEagerServiceImpl*>(eager_service_);
+   return eager_service->CreateMasterContext(context_id, context);
++#endif  // defined(IS_MOBILE_PLATFORM)
+ }
+ 
+ Status GrpcServer::UpdateServerDef(const ServerDef& server_def) {
+"""
+
+
 SAVED_MODEL_ANDROID_LOADER_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
 +++ b/tensorflow/cc/saved_model/BUILD
 @@ -92,7 +92,7 @@
@@ -871,6 +943,8 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += TF_C_API_EXPERIMENTAL_BUILD_PATCH
     text += TF_C_API_EXPERIMENTAL_CC_PATCH
     text += DISTRIBUTED_EAGER_ANDROID_PATCH
+    text += GRPC_SERVER_LIB_ANDROID_BUILD_PATCH
+    text += GRPC_SERVER_LIB_ANDROID_CC_PATCH
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     if not text.endswith("\n"):
