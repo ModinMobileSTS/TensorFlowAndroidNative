@@ -717,6 +717,95 @@ TF_C_API_EXPERIMENTAL_CC_PATCH = """--- a/tensorflow/c/c_api_experimental.cc
 """
 
 
+DISTRIBUTED_EAGER_ANDROID_PATCH = """--- a/tensorflow/core/distributed_runtime/eager/BUILD
++++ b/tensorflow/core/distributed_runtime/eager/BUILD
+@@ -23,9 +23,12 @@ cc_library(
+
+ cc_library(
+     name = "cluster_function_library_runtime",
+-    srcs = [
+-        "cluster_function_library_runtime.cc",
+-    ],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "cluster_function_library_runtime.cc",
++        ],
++    }),
+     hdrs = [
+         "cluster_function_library_runtime.h",
+     ],
+@@ -71,7 +74,10 @@ cc_library(
+
+ cc_library(
+     name = "remote_execute_node",
+-    srcs = ["remote_execute_node.cc"],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": ["remote_execute_node.cc"],
++    }),
+     hdrs = ["remote_execute_node.h"],
+     deps = [
+         ":eager_client",
+@@ -90,7 +96,10 @@ cc_library(
+
+ cc_library(
+     name = "eager_service_impl",
+-    srcs = ["eager_service_impl.cc"],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": ["eager_service_impl.cc"],
++    }),
+     hdrs = [
+         "eager_service_impl.h",
+     ],
+@@ -154,9 +163,12 @@ tf_cc_test(
+
+ cc_library(
+     name = "remote_mgr",
+-    srcs = [
+-        "remote_mgr.cc",
+-    ],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "remote_mgr.cc",
++        ],
++    }),
+     hdrs = [
+         "remote_mgr.h",
+     ],
+@@ -185,7 +197,10 @@ tf_cc_test(
+
+ cc_library(
+     name = "remote_tensor_handle_data",
+-    srcs = ["remote_tensor_handle_data.cc"],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": ["remote_tensor_handle_data.cc"],
++    }),
+     hdrs = ["remote_tensor_handle_data.h"],
+     deps = [
+         ":destroy_tensor_handle_node",
+@@ -199,9 +214,12 @@ cc_library(
+
+ cc_library(
+     name = "remote_copy_node",
+-    srcs = [
+-        "remote_copy_node.cc",
+-    ],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "remote_copy_node.cc",
++        ],
++    }),
+     hdrs = [
+         "remote_copy_node.h",
+     ],
+"""
+
+
 SAVED_MODEL_ANDROID_LOADER_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
 +++ b/tensorflow/cc/saved_model/BUILD
 @@ -92,7 +92,7 @@
@@ -781,6 +870,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += TF_C_BUILD_ANDROID_FULL_DEPS_PATCH
     text += TF_C_API_EXPERIMENTAL_BUILD_PATCH
     text += TF_C_API_EXPERIMENTAL_CC_PATCH
+    text += DISTRIBUTED_EAGER_ANDROID_PATCH
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     if not text.endswith("\n"):
