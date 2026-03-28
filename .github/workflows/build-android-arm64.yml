@@ -46,6 +46,15 @@ jobs:
             ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
             ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-
 
+      - name: Restore Bazel Disk Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.bazel-cache/disk
+          key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py', '.github/workflows/build-android-arm64.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
+            ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-
+
       - name: Clone TensorFlow Java
         shell: bash
         run: |
@@ -112,12 +121,19 @@ jobs:
           export ANDROID_SDK_API_LEVEL="${ANDROID_API_LEVEL}"
           export ANDROID_BUILD_TOOLS_VERSION="${ANDROID_BUILD_TOOLS_VERSION}"
           export ANDROID_NDK_API_LEVEL="${ANDROID_NDK_API_LEVEL}"
+          export ANDROID_STL_INCLUDE="${ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/include"
+          export ANDROID_STL_INCLUDE_ABI="${ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include"
+          export ANDROID_STL_LIB="${ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a"
           export JAVA_HOME="${JAVA_HOME_11_X64}"
           export LANG="C.UTF-8"
           export LC_ALL="C.UTF-8"
           export PATH="${JAVA_HOME}/bin:${PATH}"
+          export CPLUS_INCLUDE_PATH="${ANDROID_STL_INCLUDE}:${ANDROID_STL_INCLUDE_ABI}${CPLUS_INCLUDE_PATH:+:${CPLUS_INCLUDE_PATH}}"
+          export C_INCLUDE_PATH="${ANDROID_STL_INCLUDE_ABI}${C_INCLUDE_PATH:+:${C_INCLUDE_PATH}}"
+          export LIBRARY_PATH="${ANDROID_STL_LIB}${LIBRARY_PATH:+:${LIBRARY_PATH}}"
           export BAZEL_REPOSITORY_CACHE="${GITHUB_WORKSPACE}/.bazel-cache/repository"
-          mkdir -p "${BAZEL_REPOSITORY_CACHE}"
+          export BAZEL_DISK_CACHE="${GITHUB_WORKSPACE}/.bazel-cache/disk"
+          mkdir -p "${BAZEL_REPOSITORY_CACHE}" "${BAZEL_DISK_CACHE}"
           mkdir -p "${GITHUB_WORKSPACE}/artifacts"
           cd tfjava
           mvn -B -e \
