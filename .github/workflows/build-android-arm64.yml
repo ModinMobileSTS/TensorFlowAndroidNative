@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - codex/fix-android-arm64-build
 
 jobs:
   build:
@@ -36,23 +37,98 @@ jobs:
             "build-tools;${ANDROID_BUILD_TOOLS_VERSION}" \
             "ndk;${ANDROID_NDK_VERSION}"
 
+      - name: Restore Bazel Repository Cache
+        id: restore_bazel_repository_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/.bazel-cache/repository
+          key: ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
+            ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-
+
+      - name: Restore Bazel Disk Cache
+        id: restore_bazel_disk_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/.bazel-cache/disk
+          key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
+            ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-
+
+      - name: Clone TensorFlow Java
+        shell: bash
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/tensorflow/java.git tfjava
+          cd tfjava
+          git checkout "${TFJAVA_COMMIT}"
+
       - name: Set Up Java 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "11"
-
-      - name: Clone TensorFlow Java
-        shell: bash
-        run: |
-          git clone https://github.com/tensorflow/java.git tfjava
-          cd tfjava
-          git checkout "${TFJAVA_COMMIT}"
+          cache: maven
+          cache-dependency-path: |
+            tfjava/pom.xml
+            tfjava/**/pom.xml
 
       - name: Patch TensorFlow Java For Android ARM64
         shell: bash
         run: |
           python3 scripts/patch_tfjava.py tfjava
+
+      - name: Vendor Android GNU STL Headers
+        shell: bash
+        run: |
+          set -e
+          STL_ROOT="tfjava/tensorflow-core/tensorflow-core-api/android-gnu-stl"
+          NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
+          rm -rf "${STL_ROOT}"
+          mkdir -p "${STL_ROOT}/include" "${STL_ROOT}/arm64-v8a/include"
+          if [ -d "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/include" ]; then
+            GNUSTL_LIB_ROOT="${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a"
+            SUPCXX_PATH="$(find "${NDK_ROOT}" -path '*aarch64*' -name 'libsupc++.a' -print -quit 2>/dev/null || true)"
+            if [ -z "${SUPCXX_PATH}" ]; then
+              SUPCXX_PATH="$(find "${NDK_ROOT}" -name 'libsupc++.a' -print -quit 2>/dev/null || true)"
+            fi
+            cp -R "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/include/." "${STL_ROOT}/include/"
+            if [ -d "${GNUSTL_LIB_ROOT}/include" ]; then
+              cp -R "${GNUSTL_LIB_ROOT}/include/." "${STL_ROOT}/arm64-v8a/include/"
+            fi
+            cp "${GNUSTL_LIB_ROOT}/libgnustl_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_real.a"
+            if [ -n "${SUPCXX_PATH}" ]; then
+              cp "${SUPCXX_PATH}" "${STL_ROOT}/arm64-v8a/libsupc++.a"
+              printf 'GROUP ( libgnustl_real.a libsupc++.a )\n' > "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            else
+              cp "${GNUSTL_LIB_ROOT}/libgnustl_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            fi
+          else
+            LIBCXX_LIB_ROOT="${NDK_ROOT}/sources/cxx-stl/llvm-libc++/libs/arm64-v8a"
+            LIBCXXABI_PATH="$(find "${NDK_ROOT}" -path '*arm64-v8a*' -name 'libc++abi.a' -print -quit 2>/dev/null || true)"
+            ANDROID_SUPPORT_PATH="$(find "${NDK_ROOT}" -path '*arm64-v8a*' -name 'libandroid_support.a' -print -quit 2>/dev/null || true)"
+            cp -R "${NDK_ROOT}/sources/cxx-stl/llvm-libc++/include/." "${STL_ROOT}/include/"
+            if [ -d "${NDK_ROOT}/sources/cxx-stl/llvm-libc++abi/include" ]; then
+              cp -R "${NDK_ROOT}/sources/cxx-stl/llvm-libc++abi/include/." "${STL_ROOT}/include/"
+            fi
+            if [ -d "${NDK_ROOT}/sources/android/support/include" ]; then
+              cp -R "${NDK_ROOT}/sources/android/support/include/." "${STL_ROOT}/include/"
+            fi
+            cp "${LIBCXX_LIB_ROOT}/libc++_static.a" "${STL_ROOT}/arm64-v8a/libc++_static.a"
+            if [ -f "${LIBCXXABI_PATH}" ]; then
+              cp "${LIBCXXABI_PATH}" "${STL_ROOT}/arm64-v8a/libc++abi.a"
+            fi
+            if [ -f "${ANDROID_SUPPORT_PATH}" ]; then
+              cp "${ANDROID_SUPPORT_PATH}" "${STL_ROOT}/arm64-v8a/libandroid_support.a"
+              printf 'GROUP ( libc++_static.a libc++abi.a libandroid_support.a )\n' > "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            elif [ -f "${LIBCXXABI_PATH}" ]; then
+              printf 'GROUP ( libc++_static.a libc++abi.a )\n' > "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            else
+              cp "${LIBCXX_LIB_ROOT}/libc++_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            fi
+          fi
+          find "${STL_ROOT}" -maxdepth 3 -type f | sort | sed -n '1,20p'
 
       - name: Write TensorFlow Configure Overrides
         shell: bash
@@ -80,6 +156,8 @@ jobs:
           echo '---'
           grep -n 'PLATFORM>${javacpp.platform}' tensorflow-core/tensorflow-core-api/pom.xml || true
           echo '---'
+          grep -n 'android-gnu-stl' tensorflow-core/tensorflow-core-api/pom.xml || true
+          echo '---'
           grep -n 'androidndk\\|androidsdk' tensorflow-core/tensorflow-core-api/WORKSPACE || true
           echo '---'
           grep -n 'android-arm64' tensorflow-core/tensorflow-core-api/src/main/java/org/tensorflow/internal/c_api/presets/tensorflow.java || true
@@ -98,10 +176,37 @@ jobs:
           export ANDROID_SDK_API_LEVEL="${ANDROID_API_LEVEL}"
           export ANDROID_BUILD_TOOLS_VERSION="${ANDROID_BUILD_TOOLS_VERSION}"
           export ANDROID_NDK_API_LEVEL="${ANDROID_NDK_API_LEVEL}"
+          export ANDROID_STL_INCLUDE="${ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/include"
+          export ANDROID_STL_INCLUDE_ABI="${ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include"
+          export ANDROID_STL_LIB="${ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a"
+          export ANDROID_LLVM_BIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export ANDROID_GCC_TOOLCHAIN="${ANDROID_NDK_HOME}/toolchains/aarch64-linux-android-4.9/prebuilt/linux-x86_64"
+          export ANDROID_CLANG_TARGET="aarch64-linux-android${ANDROID_NDK_API_LEVEL}"
+          export ANDROID_LLVM_CXX_WRAPPER="${GITHUB_WORKSPACE}/android-clang++"
+          if [ -x "${ANDROID_LLVM_BIN}/${ANDROID_CLANG_TARGET}-clang++" ]; then
+            printf '%s\n' '#!/usr/bin/env bash' \
+              "exec \"${ANDROID_LLVM_BIN}/${ANDROID_CLANG_TARGET}-clang++\" -fuse-ld=lld -B\"${ANDROID_LLVM_BIN}\" --gcc-toolchain=\"${ANDROID_GCC_TOOLCHAIN}\" \"\$@\"" \
+              > "${ANDROID_LLVM_CXX_WRAPPER}"
+          elif [ -x "${ANDROID_LLVM_BIN}/clang++" ]; then
+            printf '%s\n' '#!/usr/bin/env bash' \
+              "exec \"${ANDROID_LLVM_BIN}/clang++\" --target=${ANDROID_CLANG_TARGET} -fuse-ld=lld -B\"${ANDROID_LLVM_BIN}\" --gcc-toolchain=\"${ANDROID_GCC_TOOLCHAIN}\" \"\$@\"" \
+              > "${ANDROID_LLVM_CXX_WRAPPER}"
+          else
+            echo "No usable LLVM clang++ found under ${ANDROID_LLVM_BIN}" >&2
+            exit 1
+          fi
+          chmod +x "${ANDROID_LLVM_CXX_WRAPPER}"
+          "${ANDROID_LLVM_CXX_WRAPPER}" --version
           export JAVA_HOME="${JAVA_HOME_11_X64}"
           export LANG="C.UTF-8"
           export LC_ALL="C.UTF-8"
           export PATH="${JAVA_HOME}/bin:${PATH}"
+          export CPLUS_INCLUDE_PATH="${ANDROID_STL_INCLUDE}:${ANDROID_STL_INCLUDE_ABI}${CPLUS_INCLUDE_PATH:+:${CPLUS_INCLUDE_PATH}}"
+          export C_INCLUDE_PATH="${ANDROID_STL_INCLUDE_ABI}${C_INCLUDE_PATH:+:${C_INCLUDE_PATH}}"
+          export LIBRARY_PATH="${ANDROID_STL_LIB}${LIBRARY_PATH:+:${LIBRARY_PATH}}"
+          export BAZEL_REPOSITORY_CACHE="${GITHUB_WORKSPACE}/.bazel-cache/repository"
+          export BAZEL_DISK_CACHE="${GITHUB_WORKSPACE}/.bazel-cache/disk"
+          mkdir -p "${BAZEL_REPOSITORY_CACHE}" "${BAZEL_DISK_CACHE}"
           mkdir -p "${GITHUB_WORKSPACE}/artifacts"
           cd tfjava
           mvn -B -e \
@@ -110,6 +215,7 @@ jobs:
             -DskipTests \
             -Djavacpp.platform="${ANDROID_PLATFORM}" \
             -Djavacpp.platform.properties="${ANDROID_PLATFORM}" \
+            -Djavacpp.platform.compiler="${ANDROID_LLVM_CXX_WRAPPER}" \
             -Djavacpp.platform.root="${ANDROID_NDK_HOME}" \
             -pl tensorflow-core/tensorflow-core-api \
             -am \
@@ -129,12 +235,15 @@ jobs:
               raise SystemExit(0)
 
           lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
-          patterns = [
-              re.compile(r"^(.+?:\d+(?::\d+)?: (?:fatal )?error: .+)$"),
-              re.compile(r"^(.+?UnsatisfiedLinkError.+)$"),
-              re.compile(r"^(.+?NoSuch.+)$"),
-              re.compile(r"^(ERROR: .+)$"),
-              re.compile(r"^(FAILED: .+)$"),
+          primary_patterns = [
+              re.compile(r"^\s*.+?:\d+(?::\d+)?: (?:fatal )?error: .+$"),
+              re.compile(r"^\s*.+?: error: .+$"),
+              re.compile(r"^\s*(?:ld(?:\.lld)?|clang(?:\+\+)?): error: .+$"),
+              re.compile(r"^\s*undefined reference to .+$"),
+              re.compile(r"^\s*cannot find -l.+$"),
+              re.compile(r"^\s*collect2: error: .+$"),
+              re.compile(r"^\s*.+?UnsatisfiedLinkError.+$"),
+              re.compile(r"^\s*.+?NoSuch.+$"),
           ]
 
           skip = (
@@ -144,15 +253,37 @@ jobs:
               "BUILD FAILURE",
               "compilation of rule",
               "Linking of rule",
+              "Failed to restore: Cache service responded with 400",
           )
+
+          def is_skippable(line: str) -> bool:
+              return any(token in line for token in skip)
 
           hit = None
           for i, line in enumerate(lines):
-              if any(token in line for token in skip):
+              if is_skippable(line):
                   continue
-              if any(p.search(line) for p in patterns):
+              if any(p.search(line) for p in primary_patterns):
                   hit = i
                   break
+
+          if hit is None:
+              for i in range(len(lines) - 1, -1, -1):
+                  line = lines[i]
+                  normalized = line.strip()
+                  if not normalized or is_skippable(line):
+                      continue
+                  if "error:" in normalized or "undefined reference" in normalized:
+                      hit = i
+                      break
+
+          if hit is None:
+              for i, line in enumerate(lines):
+                  if is_skippable(line):
+                      continue
+                  if line.startswith("ERROR: ") or line.startswith("FAILED: "):
+                      hit = i
+                      break
 
           if hit is None:
               hit = max(0, len(lines) - 80)
@@ -178,26 +309,52 @@ jobs:
         shell: bash
         run: |
           set -e
-          mkdir -p "${GITHUB_WORKSPACE}/artifacts/output"
-          if [ -d tfjava/tensorflow-core/tensorflow-core-api/target/native ]; then
-            cp -R tfjava/tensorflow-core/tensorflow-core-api/target/native/. "${GITHUB_WORKSPACE}/artifacts/output/" || true
+          mkdir -p "${GITHUB_WORKSPACE}/artifacts/runtime" "${GITHUB_WORKSPACE}/artifacts/logs"
+          NATIVE_ROOT="tfjava/tensorflow-core/tensorflow-core-api/target/native"
+          for name in \
+            libjnitensorflow.so \
+            libjnijavacpp.so \
+            libtensorflow.so.2 \
+            libtensorflow_framework.so.2
+          do
+            src="$(find "${NATIVE_ROOT}" -type f -name "${name}" -print -quit 2>/dev/null || true)"
+            if [ -n "${src}" ]; then
+              cp "${src}" "${GITHUB_WORKSPACE}/artifacts/runtime/${name}"
+            fi
+          done
+          if [ -f "${GITHUB_WORKSPACE}/artifacts/build.log" ]; then
+            mv "${GITHUB_WORKSPACE}/artifacts/build.log" "${GITHUB_WORKSPACE}/artifacts/logs/build.log"
           fi
-          if [ -d tfjava/tensorflow-core/tensorflow-core-api/target ]; then
-            find tfjava/tensorflow-core/tensorflow-core-api/target -maxdepth 1 -type f \( -name '*.jar' -o -name '*.pom' \) -exec cp {} "${GITHUB_WORKSPACE}/artifacts/output/" \; || true
-          fi
-          if [ -f "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libjnitensorflow.so" ]; then
-            cp "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libjnitensorflow.so" \
-              "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libtensorflow_jni.so"
-          fi
-          find "${GITHUB_WORKSPACE}/artifacts" -maxdepth 5 -type f | sort > "${GITHUB_WORKSPACE}/artifacts/manifest.txt"
-          if [ -d "${GITHUB_WORKSPACE}/artifacts/output" ]; then
-            (cd "${GITHUB_WORKSPACE}/artifacts/output" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "${GITHUB_WORKSPACE}/artifacts/sha256.txt" || true
+          if [ -f "${GITHUB_WORKSPACE}/artifacts/first_failure_summary.txt" ]; then
+            mv "${GITHUB_WORKSPACE}/artifacts/first_failure_summary.txt" "${GITHUB_WORKSPACE}/artifacts/logs/first_failure_summary.txt"
           fi
 
-      - name: Upload Artifacts
+      - name: Save Bazel Repository Cache
+        if: always() && steps.restore_bazel_repository_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.bazel-cache/repository
+          key: ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
+
+      - name: Save Bazel Disk Cache
+        if: always() && steps.restore_bazel_disk_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.bazel-cache/disk
+          key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
+
+      - name: Upload Runtime Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tensorflow-android-arm64-build
-          path: artifacts
+          path: artifacts/runtime
+          if-no-files-found: warn
+
+      - name: Upload Failure Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tensorflow-android-arm64-debug
+          path: artifacts/logs
           if-no-files-found: warn
