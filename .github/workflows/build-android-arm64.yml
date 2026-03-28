@@ -311,6 +311,7 @@ jobs:
           set -e
           mkdir -p "${GITHUB_WORKSPACE}/artifacts/runtime" "${GITHUB_WORKSPACE}/artifacts/logs"
           NATIVE_ROOT="tfjava/tensorflow-core/tensorflow-core-api/target/native"
+          STRIP_BIN="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           for name in \
             libjnitensorflow.so \
             libjnijavacpp.so \
@@ -322,6 +323,17 @@ jobs:
               cp "${src}" "${GITHUB_WORKSPACE}/artifacts/runtime/${name}"
             fi
           done
+          if [ -x "${STRIP_BIN}" ]; then
+            echo "Runtime library sizes before strip:"
+            find "${GITHUB_WORKSPACE}/artifacts/runtime" -maxdepth 1 -type f -name '*.so*' -exec du -h {} \; | sort
+            find "${GITHUB_WORKSPACE}/artifacts/runtime" -maxdepth 1 -type f -name '*.so*' -print0 | while IFS= read -r -d '' lib; do
+              "${STRIP_BIN}" --strip-unneeded "${lib}" || "${STRIP_BIN}" --strip-debug "${lib}" || true
+            done
+            echo "Runtime library sizes after strip:"
+            find "${GITHUB_WORKSPACE}/artifacts/runtime" -maxdepth 1 -type f -name '*.so*' -exec du -h {} \; | sort
+          else
+            echo "llvm-strip not found at ${STRIP_BIN}; uploading unstripped runtime libraries" >&2
+          fi
           if [ -f "${GITHUB_WORKSPACE}/artifacts/build.log" ]; then
             mv "${GITHUB_WORKSPACE}/artifacts/build.log" "${GITHUB_WORKSPACE}/artifacts/logs/build.log"
           fi
