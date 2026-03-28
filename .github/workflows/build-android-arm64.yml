@@ -155,20 +155,23 @@ jobs:
           export ANDROID_STL_INCLUDE_ABI="${ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include"
           export ANDROID_STL_LIB="${ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a"
           export ANDROID_LLVM_BIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export ANDROID_GCC_TOOLCHAIN="${ANDROID_NDK_HOME}/toolchains/aarch64-linux-android-4.9/prebuilt/linux-x86_64"
+          export ANDROID_CLANG_TARGET="aarch64-linux-android${ANDROID_NDK_API_LEVEL}"
           export ANDROID_LLVM_CXX_WRAPPER="${GITHUB_WORKSPACE}/android-clang++"
-          if [ -x "${ANDROID_LLVM_BIN}/aarch64-linux-android${ANDROID_NDK_API_LEVEL}-clang++" ]; then
+          if [ -x "${ANDROID_LLVM_BIN}/${ANDROID_CLANG_TARGET}-clang++" ]; then
             printf '%s\n' '#!/usr/bin/env bash' \
-              "exec \"${ANDROID_LLVM_BIN}/aarch64-linux-android${ANDROID_NDK_API_LEVEL}-clang++\" \"\$@\"" \
+              "exec \"${ANDROID_LLVM_BIN}/${ANDROID_CLANG_TARGET}-clang++\" -fuse-ld=lld -B\"${ANDROID_LLVM_BIN}\" --gcc-toolchain=\"${ANDROID_GCC_TOOLCHAIN}\" \"\$@\"" \
               > "${ANDROID_LLVM_CXX_WRAPPER}"
           elif [ -x "${ANDROID_LLVM_BIN}/clang++" ]; then
             printf '%s\n' '#!/usr/bin/env bash' \
-              "exec \"${ANDROID_LLVM_BIN}/clang++\" --target=aarch64-none-linux-android${ANDROID_NDK_API_LEVEL} \"\$@\"" \
+              "exec \"${ANDROID_LLVM_BIN}/clang++\" --target=${ANDROID_CLANG_TARGET} -fuse-ld=lld -B\"${ANDROID_LLVM_BIN}\" --gcc-toolchain=\"${ANDROID_GCC_TOOLCHAIN}\" \"\$@\"" \
               > "${ANDROID_LLVM_CXX_WRAPPER}"
           else
             echo "No usable LLVM clang++ found under ${ANDROID_LLVM_BIN}" >&2
             exit 1
           fi
           chmod +x "${ANDROID_LLVM_CXX_WRAPPER}"
+          "${ANDROID_LLVM_CXX_WRAPPER}" --version
           export JAVA_HOME="${JAVA_HOME_11_X64}"
           export LANG="C.UTF-8"
           export LC_ALL="C.UTF-8"
