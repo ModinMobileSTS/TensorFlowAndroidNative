@@ -14,10 +14,19 @@ def replace_once(text: str, old: str, new: str, path: Path) -> str:
 def patch_module_pom(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
     if "<PLATFORM>${javacpp.platform}</PLATFORM>" in text:
-        return
-    old = "<EXTENSION>${javacpp.platform.extension}</EXTENSION>"
-    new = """<EXTENSION>${javacpp.platform.extension}</EXTENSION>\n                <PLATFORM>${javacpp.platform}</PLATFORM>"""
-    text = replace_once(text, old, new, path)
+        pass
+    else:
+        old = "<EXTENSION>${javacpp.platform.extension}</EXTENSION>"
+        new = """<EXTENSION>${javacpp.platform.extension}</EXTENSION>\n                <PLATFORM>${javacpp.platform}</PLATFORM>"""
+        text = replace_once(text, old, new, path)
+    if "${env.ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/include" not in text:
+        old = """          <includePaths>\n            <includePath>${project.basedir}/</includePath>\n            <includePath>${project.basedir}/bazel-${project.artifactId}/external/org_tensorflow/</includePath>\n          </includePaths>\n"""
+        new = """          <includePaths>\n            <includePath>${project.basedir}/</includePath>\n            <includePath>${project.basedir}/bazel-${project.artifactId}/external/org_tensorflow/</includePath>\n            <includePath>${env.ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/include</includePath>\n            <includePath>${env.ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include</includePath>\n          </includePaths>\n"""
+        text = replace_once(text, old, new, path)
+    if "${env.ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a" not in text:
+        old = """          <linkPaths>\n            <linkPath>${project.basedir}/bazel-bin/external/org_tensorflow/tensorflow/</linkPath>\n          </linkPaths>\n"""
+        new = """          <linkPaths>\n            <linkPath>${project.basedir}/bazel-bin/external/org_tensorflow/tensorflow/</linkPath>\n            <linkPath>${env.ANDROID_NDK_HOME}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a</linkPath>\n          </linkPaths>\n"""
+        text = replace_once(text, old, new, path)
     path.write_text(text, encoding="utf-8")
 
 

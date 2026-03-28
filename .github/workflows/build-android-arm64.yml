@@ -38,19 +38,21 @@ jobs:
             "ndk;${ANDROID_NDK_VERSION}"
 
       - name: Restore Bazel Repository Cache
-        uses: actions/cache@v4
+        id: restore_bazel_repository_cache
+        uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.bazel-cache/repository
-          key: ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py', '.github/workflows/build-android-arm64.yml') }}
+          key: ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
           restore-keys: |
             ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
             ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-
 
       - name: Restore Bazel Disk Cache
-        uses: actions/cache@v4
+        id: restore_bazel_disk_cache
+        uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/.bazel-cache/disk
-          key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py', '.github/workflows/build-android-arm64.yml') }}
+          key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
           restore-keys: |
             ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
             ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-
@@ -58,7 +60,7 @@ jobs:
       - name: Clone TensorFlow Java
         shell: bash
         run: |
-          git clone https://github.com/tensorflow/java.git tfjava
+          git clone --filter=blob:none --no-checkout https://github.com/tensorflow/java.git tfjava
           cd tfjava
           git checkout "${TFJAVA_COMMIT}"
 
@@ -250,6 +252,20 @@ jobs:
           if [ -d "${GITHUB_WORKSPACE}/artifacts/output" ]; then
             (cd "${GITHUB_WORKSPACE}/artifacts/output" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "${GITHUB_WORKSPACE}/artifacts/sha256.txt" || true
           fi
+
+      - name: Save Bazel Repository Cache
+        if: always() && steps.restore_bazel_repository_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.bazel-cache/repository
+          key: ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
+
+      - name: Save Bazel Disk Cache
+        if: always() && steps.restore_bazel_disk_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.bazel-cache/disk
+          key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
 
       - name: Upload Artifacts
         if: always()
