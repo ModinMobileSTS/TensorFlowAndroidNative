@@ -309,20 +309,24 @@ jobs:
         shell: bash
         run: |
           set -e
-          mkdir -p "${GITHUB_WORKSPACE}/artifacts/output"
-          if [ -d tfjava/tensorflow-core/tensorflow-core-api/target/native ]; then
-            cp -R tfjava/tensorflow-core/tensorflow-core-api/target/native/. "${GITHUB_WORKSPACE}/artifacts/output/" || true
+          mkdir -p "${GITHUB_WORKSPACE}/artifacts/runtime" "${GITHUB_WORKSPACE}/artifacts/logs"
+          NATIVE_ROOT="tfjava/tensorflow-core/tensorflow-core-api/target/native"
+          for name in \
+            libjnitensorflow.so \
+            libjnijavacpp.so \
+            libtensorflow.so.2 \
+            libtensorflow_framework.so.2
+          do
+            src="$(find "${NATIVE_ROOT}" -type f -name "${name}" -print -quit 2>/dev/null || true)"
+            if [ -n "${src}" ]; then
+              cp "${src}" "${GITHUB_WORKSPACE}/artifacts/runtime/${name}"
+            fi
+          done
+          if [ -f "${GITHUB_WORKSPACE}/artifacts/build.log" ]; then
+            mv "${GITHUB_WORKSPACE}/artifacts/build.log" "${GITHUB_WORKSPACE}/artifacts/logs/build.log"
           fi
-          if [ -d tfjava/tensorflow-core/tensorflow-core-api/target ]; then
-            find tfjava/tensorflow-core/tensorflow-core-api/target -maxdepth 1 -type f \( -name '*.jar' -o -name '*.pom' \) -exec cp {} "${GITHUB_WORKSPACE}/artifacts/output/" \; || true
-          fi
-          if [ -f "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libjnitensorflow.so" ]; then
-            cp "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libjnitensorflow.so" \
-              "${GITHUB_WORKSPACE}/artifacts/output/org/tensorflow/internal/c_api/android-arm64/libtensorflow_jni.so"
-          fi
-          find "${GITHUB_WORKSPACE}/artifacts" -maxdepth 5 -type f | sort > "${GITHUB_WORKSPACE}/artifacts/manifest.txt"
-          if [ -d "${GITHUB_WORKSPACE}/artifacts/output" ]; then
-            (cd "${GITHUB_WORKSPACE}/artifacts/output" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "${GITHUB_WORKSPACE}/artifacts/sha256.txt" || true
+          if [ -f "${GITHUB_WORKSPACE}/artifacts/first_failure_summary.txt" ]; then
+            mv "${GITHUB_WORKSPACE}/artifacts/first_failure_summary.txt" "${GITHUB_WORKSPACE}/artifacts/logs/first_failure_summary.txt"
           fi
 
       - name: Save Bazel Repository Cache
@@ -339,10 +343,18 @@ jobs:
           path: ${{ github.workspace }}/.bazel-cache/disk
           key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
 
-      - name: Upload Artifacts
+      - name: Upload Runtime Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tensorflow-android-arm64-build
-          path: artifacts
+          path: artifacts/runtime
+          if-no-files-found: warn
+
+      - name: Upload Failure Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tensorflow-android-arm64-debug
+          path: artifacts/logs
           if-no-files-found: warn
