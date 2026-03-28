@@ -23,6 +23,10 @@ def patch_module_pom(path: Path) -> None:
         old = """          <includePaths>\n            <includePath>${project.basedir}/</includePath>\n            <includePath>${project.basedir}/bazel-${project.artifactId}/external/org_tensorflow/</includePath>\n          </includePaths>\n"""
         new = """          <includePaths>\n            <includePath>${project.basedir}/</includePath>\n            <includePath>${project.basedir}/bazel-${project.artifactId}/external/org_tensorflow/</includePath>\n            <includePath>${project.basedir}/android-gnu-stl/include</includePath>\n            <includePath>${project.basedir}/android-gnu-stl/arm64-v8a/include</includePath>\n          </includePaths>\n"""
         text = replace_once(text, old, new, path)
+    if "<linkPath>${project.basedir}/android-gnu-stl/arm64-v8a</linkPath>" not in text:
+        old = """          <linkPaths>\n            <linkPath>${project.basedir}/bazel-bin/external/org_tensorflow/tensorflow/</linkPath>\n          </linkPaths>\n"""
+        new = """          <linkPaths>\n            <linkPath>${project.basedir}/bazel-bin/external/org_tensorflow/tensorflow/</linkPath>\n            <linkPath>${project.basedir}/android-gnu-stl/arm64-v8a</linkPath>\n          </linkPaths>\n"""
+        text = replace_once(text, old, new, path)
     path.write_text(text, encoding="utf-8")
 
 

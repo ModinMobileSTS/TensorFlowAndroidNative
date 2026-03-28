@@ -84,10 +84,26 @@ jobs:
         run: |
           set -e
           STL_ROOT="tfjava/tensorflow-core/tensorflow-core-api/android-gnu-stl"
+          NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
           rm -rf "${STL_ROOT}"
           mkdir -p "${STL_ROOT}/include" "${STL_ROOT}/arm64-v8a/include"
-          cp -R "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}/sources/cxx-stl/gnu-libstdc++/4.9/include/." "${STL_ROOT}/include/"
-          cp -R "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include/." "${STL_ROOT}/arm64-v8a/include/"
+          if [ -d "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/include" ]; then
+            cp -R "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/include/." "${STL_ROOT}/include/"
+            if [ -d "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include" ]; then
+              cp -R "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include/." "${STL_ROOT}/arm64-v8a/include/"
+            fi
+            cp "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/libgnustl_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+          else
+            cp -R "${NDK_ROOT}/sources/cxx-stl/llvm-libc++/include/." "${STL_ROOT}/include/"
+            if [ -d "${NDK_ROOT}/sources/cxx-stl/llvm-libc++abi/include" ]; then
+              cp -R "${NDK_ROOT}/sources/cxx-stl/llvm-libc++abi/include/." "${STL_ROOT}/include/"
+            fi
+            if [ -d "${NDK_ROOT}/sources/android/support/include" ]; then
+              cp -R "${NDK_ROOT}/sources/android/support/include/." "${STL_ROOT}/include/"
+            fi
+            cp "${NDK_ROOT}/sources/cxx-stl/llvm-libc++/libs/arm64-v8a/libc++_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+          fi
+          find "${STL_ROOT}" -maxdepth 3 -type f | sort | sed -n '1,20p'
 
       - name: Write TensorFlow Configure Overrides
         shell: bash
