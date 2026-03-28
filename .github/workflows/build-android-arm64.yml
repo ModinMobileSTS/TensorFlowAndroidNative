@@ -88,12 +88,26 @@ jobs:
           rm -rf "${STL_ROOT}"
           mkdir -p "${STL_ROOT}/include" "${STL_ROOT}/arm64-v8a/include"
           if [ -d "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/include" ]; then
-            cp -R "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/include/." "${STL_ROOT}/include/"
-            if [ -d "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include" ]; then
-              cp -R "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/include/." "${STL_ROOT}/arm64-v8a/include/"
+            GNUSTL_LIB_ROOT="${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a"
+            SUPCXX_PATH="$(find "${NDK_ROOT}" -path '*aarch64*' -name 'libsupc++.a' -print -quit 2>/dev/null || true)"
+            if [ -z "${SUPCXX_PATH}" ]; then
+              SUPCXX_PATH="$(find "${NDK_ROOT}" -name 'libsupc++.a' -print -quit 2>/dev/null || true)"
             fi
-            cp "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/libs/arm64-v8a/libgnustl_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            cp -R "${NDK_ROOT}/sources/cxx-stl/gnu-libstdc++/4.9/include/." "${STL_ROOT}/include/"
+            if [ -d "${GNUSTL_LIB_ROOT}/include" ]; then
+              cp -R "${GNUSTL_LIB_ROOT}/include/." "${STL_ROOT}/arm64-v8a/include/"
+            fi
+            cp "${GNUSTL_LIB_ROOT}/libgnustl_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_real.a"
+            if [ -n "${SUPCXX_PATH}" ]; then
+              cp "${SUPCXX_PATH}" "${STL_ROOT}/arm64-v8a/libsupc++.a"
+              printf 'GROUP ( libgnustl_real.a libsupc++.a )\n' > "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            else
+              cp "${GNUSTL_LIB_ROOT}/libgnustl_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            fi
           else
+            LIBCXX_LIB_ROOT="${NDK_ROOT}/sources/cxx-stl/llvm-libc++/libs/arm64-v8a"
+            LIBCXXABI_PATH="$(find "${NDK_ROOT}" -path '*arm64-v8a*' -name 'libc++abi.a' -print -quit 2>/dev/null || true)"
+            ANDROID_SUPPORT_PATH="$(find "${NDK_ROOT}" -path '*arm64-v8a*' -name 'libandroid_support.a' -print -quit 2>/dev/null || true)"
             cp -R "${NDK_ROOT}/sources/cxx-stl/llvm-libc++/include/." "${STL_ROOT}/include/"
             if [ -d "${NDK_ROOT}/sources/cxx-stl/llvm-libc++abi/include" ]; then
               cp -R "${NDK_ROOT}/sources/cxx-stl/llvm-libc++abi/include/." "${STL_ROOT}/include/"
@@ -101,7 +115,18 @@ jobs:
             if [ -d "${NDK_ROOT}/sources/android/support/include" ]; then
               cp -R "${NDK_ROOT}/sources/android/support/include/." "${STL_ROOT}/include/"
             fi
-            cp "${NDK_ROOT}/sources/cxx-stl/llvm-libc++/libs/arm64-v8a/libc++_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            cp "${LIBCXX_LIB_ROOT}/libc++_static.a" "${STL_ROOT}/arm64-v8a/libc++_static.a"
+            if [ -f "${LIBCXXABI_PATH}" ]; then
+              cp "${LIBCXXABI_PATH}" "${STL_ROOT}/arm64-v8a/libc++abi.a"
+            fi
+            if [ -f "${ANDROID_SUPPORT_PATH}" ]; then
+              cp "${ANDROID_SUPPORT_PATH}" "${STL_ROOT}/arm64-v8a/libandroid_support.a"
+              printf 'GROUP ( libc++_static.a libc++abi.a libandroid_support.a )\n' > "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            elif [ -f "${LIBCXXABI_PATH}" ]; then
+              printf 'GROUP ( libc++_static.a libc++abi.a )\n' > "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            else
+              cp "${LIBCXX_LIB_ROOT}/libc++_static.a" "${STL_ROOT}/arm64-v8a/libgnustl_static.a"
+            fi
           fi
           find "${STL_ROOT}" -maxdepth 3 -type f | sort | sed -n '1,20p'
 
