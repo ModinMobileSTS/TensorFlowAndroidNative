@@ -1500,8 +1500,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += TF_C_API_EXPERIMENTAL_CC_PATCH
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
-    text += ANDROID_PORTABLE_LIB_SHIM_PATCH
-    text = normalize_unified_diff_hunk_counts(text)
+    text += normalize_unified_diff_hunk_counts(ANDROID_PORTABLE_LIB_SHIM_PATCH)
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
