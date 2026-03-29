@@ -22,6 +22,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Reclaim Runner Disk Space
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "Disk usage before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          echo "Disk usage after cleanup:"
+          df -h
+
       - name: Set Up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
 
@@ -46,16 +56,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
             ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-
-
-      - name: Restore Bazel Disk Cache
-        id: restore_bazel_disk_cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ github.workspace }}/.bazel-cache/disk
-          key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
-          restore-keys: |
-            ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-
-            ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-
 
       - name: Clone TensorFlow Java
         shell: bash
@@ -205,8 +205,7 @@ jobs:
           export C_INCLUDE_PATH="${ANDROID_STL_INCLUDE_ABI}${C_INCLUDE_PATH:+:${C_INCLUDE_PATH}}"
           export LIBRARY_PATH="${ANDROID_STL_LIB}${LIBRARY_PATH:+:${LIBRARY_PATH}}"
           export BAZEL_REPOSITORY_CACHE="${GITHUB_WORKSPACE}/.bazel-cache/repository"
-          export BAZEL_DISK_CACHE="${GITHUB_WORKSPACE}/.bazel-cache/disk"
-          mkdir -p "${BAZEL_REPOSITORY_CACHE}" "${BAZEL_DISK_CACHE}"
+          mkdir -p "${BAZEL_REPOSITORY_CACHE}"
           mkdir -p "${GITHUB_WORKSPACE}/artifacts"
           cd tfjava
           mvn -B -e \
@@ -347,13 +346,6 @@ jobs:
         with:
           path: ${{ github.workspace }}/.bazel-cache/repository
           key: ${{ runner.os }}-bazel-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
-
-      - name: Save Bazel Disk Cache
-        if: always() && steps.restore_bazel_disk_cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/.bazel-cache/disk
-          key: ${{ runner.os }}-bazel-disk-${{ env.ANDROID_PLATFORM }}-${{ env.TFJAVA_COMMIT }}-${{ hashFiles('scripts/patch_tfjava.py') }}
 
       - name: Upload Runtime Artifacts
         if: always()
