@@ -32,14 +32,393 @@ def patch_module_pom(path: Path) -> None:
 
 def patch_build_sh(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
-    old = """# Allows us to use ccache with Bazel on Mac\nexport BAZEL_USE_CPP_ONLY_TOOLCHAIN=1\n\nexport BAZEL_VC=\"${VCINSTALLDIR:-}\"\nif [[ -d $BAZEL_VC ]]; then\n    # Work around compiler issues on Windows documented mainly in configure.py but also elsewhere\n    export BUILD_FLAGS=\"--copt=//arch:AVX `#--copt=//arch:AVX2` --copt=-DWIN32_LEAN_AND_MEAN --host_copt=-DWIN32_LEAN_AND_MEAN --copt=-DNOGDI --host_copt=-DNOGDI --copt=-D_USE_MATH_DEFINES --host_copt=-D_USE_MATH_DEFINES --define=override_eigen_strong_inline=true\"\n    # https://software.intel.com/en-us/articles/intel-optimization-for-tensorflow-installation-guide#wind_B_S\n    export PATH=$PATH:$(pwd)/bazel-tensorflow-core-api/external/mkl_windows/lib/\n    export PYTHON_BIN_PATH=$(which python.exe)\nelse\n    export BUILD_FLAGS=\"--copt=-msse4.1 --copt=-msse4.2 --copt=-mavx `#--copt=-mavx2 --copt=-mfma` --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --linkopt=-lstdc++ --host_linkopt=-lstdc++\"\n    export PYTHON_BIN_PATH=$(which python3)\nfi\n"""
-    new = """# Allows us to use ccache with Bazel on Mac, but Android needs Bazel's Android crosstool.\nif [[ \"${PLATFORM:-}\" != \"android-arm64\" ]]; then\n    export BAZEL_USE_CPP_ONLY_TOOLCHAIN=1\nfi\n\nexport BAZEL_VC=\"${VCINSTALLDIR:-}\"\nif [[ \"${PLATFORM:-}\" == \"android-arm64\" ]]; then\n    export TF_ANDROID_COMPAT_LIB_DIR=\"$(pwd)/android-compat-libs\"\n    mkdir -p \"${TF_ANDROID_COMPAT_LIB_DIR}\"\n    printf 'INPUT(-lc)\\n' > \"${TF_ANDROID_COMPAT_LIB_DIR}/libpthread.so\"\n    printf 'INPUT(-lc)\\n' > \"${TF_ANDROID_COMPAT_LIB_DIR}/librt.so\"\n    # tfjava builds TensorFlow as an external Bazel repository, so TensorFlow's\n    # own .bazelrc does not inject framework_shared_object=true for us.\n    export BUILD_FLAGS=\"--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog\"\n    export PYTHON_BIN_PATH=$(which python3)\nelif [[ -d $BAZEL_VC ]]; then\n    # Work around compiler issues on Windows documented mainly in configure.py but also elsewhere\n    export BUILD_FLAGS=\"--copt=//arch:AVX `#--copt=//arch:AVX2` --copt=-DWIN32_LEAN_AND_MEAN --host_copt=-DWIN32_LEAN_AND_MEAN --copt=-DNOGDI --host_copt=-DNOGDI --copt=-D_USE_MATH_DEFINES --host_copt=-D_USE_MATH_DEFINES --define=override_eigen_strong_inline=true\"\n    # https://software.intel.com/en-us/articles/intel-optimization-for-tensorflow-installation-guide#wind_B_S\n    export PATH=$PATH:$(pwd)/bazel-tensorflow-core-api/external/mkl_windows/lib/\n    export PYTHON_BIN_PATH=$(which python.exe)\nelse\n    export BUILD_FLAGS=\"--copt=-msse4.1 --copt=-msse4.2 --copt=-mavx `#--copt=-mavx2 --copt=-mfma` --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --linkopt=-lstdc++ --host_linkopt=-lstdc++\"\n    export PYTHON_BIN_PATH=$(which python3)\nfi\n\nif [[ -n \"${BAZEL_REPOSITORY_CACHE:-}\" ]]; then\n    export BUILD_FLAGS=\"$BUILD_FLAGS --repository_cache=${BAZEL_REPOSITORY_CACHE}\"\nfi\nif [[ -n \"${BAZEL_DISK_CACHE:-}\" ]]; then\n    export BUILD_FLAGS=\"$BUILD_FLAGS --disk_cache=${BAZEL_DISK_CACHE}\"\nfi\n"""
+    old = """# Allows us to use ccache with Bazel on Mac
+export BAZEL_USE_CPP_ONLY_TOOLCHAIN=1
+
+export BAZEL_VC="${VCINSTALLDIR:-}"
+if [[ -d $BAZEL_VC ]]; then
+    # Work around compiler issues on Windows documented mainly in configure.py but also elsewhere
+    export BUILD_FLAGS="--copt=//arch:AVX `#--copt=//arch:AVX2` --copt=-DWIN32_LEAN_AND_MEAN --host_copt=-DWIN32_LEAN_AND_MEAN --copt=-DNOGDI --host_copt=-DNOGDI --copt=-D_USE_MATH_DEFINES --host_copt=-D_USE_MATH_DEFINES --define=override_eigen_strong_inline=true"
+    # https://software.intel.com/en-us/articles/intel-optimization-for-tensorflow-installation-guide#wind_B_S
+    export PATH=$PATH:$(pwd)/bazel-tensorflow-core-api/external/mkl_windows/lib/
+    export PYTHON_BIN_PATH=$(which python.exe)
+else
+    export BUILD_FLAGS="--copt=-msse4.1 --copt=-msse4.2 --copt=-mavx `#--copt=-mavx2 --copt=-mfma` --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --linkopt=-lstdc++ --host_linkopt=-lstdc++"
+    export PYTHON_BIN_PATH=$(which python3)
+fi
+"""
+    new = """# Allows us to use ccache with Bazel on Mac, but Android needs Bazel's Android crosstool.
+if [[ "${PLATFORM:-}" != "android-arm64" ]]; then
+    export BAZEL_USE_CPP_ONLY_TOOLCHAIN=1
+fi
+
+export BAZEL_VC="${VCINSTALLDIR:-}"
+if [[ "${PLATFORM:-}" == "android-arm64" ]]; then
+    export TF_ANDROID_COMPAT_LIB_DIR="$(pwd)/android-compat-libs"
+    mkdir -p "${TF_ANDROID_COMPAT_LIB_DIR}"
+    printf 'INPUT(-lc)\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/libpthread.so"
+    printf 'INPUT(-lc)\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/librt.so"
+    # tfjava builds TensorFlow as an external Bazel repository, so TensorFlow's
+    # own .bazelrc does not inject framework_shared_object=true for us.
+    export BUILD_FLAGS="--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog"
+    export PYTHON_BIN_PATH=$(which python3)
+elif [[ -d $BAZEL_VC ]]; then
+    # Work around compiler issues on Windows documented mainly in configure.py but also elsewhere
+    export BUILD_FLAGS="--copt=//arch:AVX `#--copt=//arch:AVX2` --copt=-DWIN32_LEAN_AND_MEAN --host_copt=-DWIN32_LEAN_AND_MEAN --copt=-DNOGDI --host_copt=-DNOGDI --copt=-D_USE_MATH_DEFINES --host_copt=-D_USE_MATH_DEFINES --define=override_eigen_strong_inline=true"
+    # https://software.intel.com/en-us/articles/intel-optimization-for-tensorflow-installation-guide#wind_B_S
+    export PATH=$PATH:$(pwd)/bazel-tensorflow-core-api/external/mkl_windows/lib/
+    export PYTHON_BIN_PATH=$(which python.exe)
+else
+    export BUILD_FLAGS="--copt=-msse4.1 --copt=-msse4.2 --copt=-mavx `#--copt=-mavx2 --copt=-mfma` --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --linkopt=-lstdc++ --host_linkopt=-lstdc++"
+    export PYTHON_BIN_PATH=$(which python3)
+fi
+
+if [[ -n "${BAZEL_REPOSITORY_CACHE:-}" ]]; then
+    export BUILD_FLAGS="$BUILD_FLAGS --repository_cache=${BAZEL_REPOSITORY_CACHE}"
+fi
+if [[ -n "${BAZEL_DISK_CACHE:-}" ]]; then
+    export BUILD_FLAGS="$BUILD_FLAGS --disk_cache=${BAZEL_DISK_CACHE}"
+fi
+"""
     text = replace_once(text, old, new, path)
-    old = """# Build C API of TensorFlow itself including a target to generate ops for Java\nbazel build $BUILD_FLAGS \\\n    @org_tensorflow//tensorflow:tensorflow \\\n    @org_tensorflow//tensorflow/tools/lib_package:jnilicenses_generate \\\n    :java_proto_gen_sources \\\n    :java_op_generator \\\n    :java_api_import \\\n    :custom_ops_test\n"""
-    new = """# Build C API of TensorFlow itself. Android cross-builds reuse the checked-in\n# generated Java sources because the generator is a host tool that loads the\n# produced TensorFlow library at build time.\nBAZEL_TARGETS=(\n    @org_tensorflow//tensorflow:tensorflow\n    @org_tensorflow//tensorflow/tools/lib_package:jnilicenses_generate\n    :custom_ops_test\n)\nif [[ \"${PLATFORM:-}\" != \"android-arm64\" ]]; then\n    BAZEL_TARGETS+=(\n        :java_proto_gen_sources\n        :java_op_generator\n        :java_api_import\n    )\nelse\n    bazel fetch \"${BAZEL_TARGETS[@]}\"\n    BAZEL_OUTPUT_BASE=\"$(bazel info output_base)\"\n    TF_C_BUILD_FILE=\"$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/c/BUILD\"\n    TF_C_BUILD_FILE=\"$TF_C_BUILD_FILE\" python3 - <<'PY'\nimport os\nfrom pathlib import Path\n\npath = Path(os.environ[\"TF_C_BUILD_FILE\"])\ntext = path.read_text(encoding=\"utf-8\")\nold = '''cc_library(\n    name = \"tf_tensor\",\n    srcs = [\"tf_tensor.cc\"],\n    hdrs = [\"tf_tensor.h\"],\n    visibility = [\"//visibility:public\"],\n    deps = select({\n        \"//tensorflow:android\": [\n            \"//tensorflow/core:android_tensorflow_lib_lite\",\n        ],\n        \"//conditions:default\": [\n            \":tf_datatype\",\n            \":tf_status\",\n            \":tf_status_helper\",\n            \":tf_tensor_internal\",\n            \"//tensorflow/core:framework\",\n            \"//tensorflow/core:lib\",\n            \"//tensorflow/core:protos_all_cc\",\n        ],\n    }),\n)'''\nnew = '''cc_library(\n    name = \"tf_tensor\",\n    srcs = [\"tf_tensor.cc\"],\n    hdrs = [\"tf_tensor.h\"],\n    visibility = [\"//visibility:public\"],\n    deps = select({\n        \"//tensorflow:android\": [\n            \":tf_datatype\",\n            \":tf_status\",\n            \":tf_status_helper\",\n            \":tf_tensor_internal\",\n            \"//tensorflow/core:framework\",\n            \"//tensorflow/core:lib\",\n            \"//tensorflow/core:protos_all_cc\",\n        ],\n        \"//conditions:default\": [\n            \":tf_datatype\",\n            \":tf_status\",\n            \":tf_status_helper\",\n            \":tf_tensor_internal\",\n            \"//tensorflow/core:framework\",\n            \"//tensorflow/core:lib\",\n            \"//tensorflow/core:protos_all_cc\",\n        ],\n    }),\n)'''\nif old in text:\n    text = text.replace(old, new, 1)\nelif new not in text:\n    raise SystemExit(f\"tf_tensor android deps not found in {path}\")\nold = '''cc_library(\n    name = \"tf_status\",\n    srcs = [\"tf_status.cc\"],\n    hdrs = [\"tf_status.h\"],\n    visibility = [\"//visibility:public\"],\n    deps = select({\n        \"//tensorflow:android\": [\n            \"//tensorflow/core:android_tensorflow_lib_lite\",\n        ],\n        \"//conditions:default\": [\n            \":tf_status_internal\",\n            \"//tensorflow/core:lib\",\n        ],\n    }),\n)'''\nnew = '''cc_library(\n    name = \"tf_status\",\n    srcs = [\"tf_status.cc\"],\n    hdrs = [\"tf_status.h\"],\n    visibility = [\"//visibility:public\"],\n    deps = select({\n        \"//tensorflow:android\": [\n            \":tf_status_internal\",\n            \"//tensorflow/core:lib\",\n        ],\n        \"//conditions:default\": [\n            \":tf_status_internal\",\n            \"//tensorflow/core:lib\",\n        ],\n    }),\n)'''\nif old in text:\n    text = text.replace(old, new, 1)\nelif new not in text:\n    raise SystemExit(f\"tf_status android deps not found in {path}\")\npath.write_text(text, encoding=\"utf-8\")\nPY\n    EAGER_BUILD_FILE=\"$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/core/common_runtime/eager/BUILD\"\n    EAGER_BUILD_FILE=\"$EAGER_BUILD_FILE\" python3 - <<'PY'\nimport os\nfrom pathlib import Path\n\npath = Path(os.environ[\"EAGER_BUILD_FILE\"])\ntext = path.read_text(encoding=\"utf-8\")\nrule_name = 'name = \"tensor_handle_data\"'\nrule_start = text.find(rule_name)\nif rule_start == -1:\n    raise SystemExit(f\"tensor_handle_data rule not found in {path}\")\nrule_end = text.find('\\n)\\n', rule_start)\nif rule_end == -1:\n    raise SystemExit(f\"tensor_handle_data rule end not found in {path}\")\nrule_end += 3\nrule = text[rule_start:rule_end]\nold = '''        \"//tensorflow:android\": [\n            \"//tensorflow/core:android_tensorflow_lib_lite\",\n        ],'''\nnew = '''        \"//tensorflow:android\": [\n            \"@com_google_absl//absl/types:variant\",\n            \"//tensorflow/core:framework\",\n            \"//tensorflow/core:lib\",\n            \"//tensorflow/core/profiler/lib:traceme\",\n        ],'''\nif old in rule:\n    rule = rule.replace(old, new, 1)\nelif new not in rule:\n    raise SystemExit(f\"tensor_handle_data android deps not found in {path}\")\ntext = text[:rule_start] + rule + text[rule_end:]\npath.write_text(text, encoding=\"utf-8\")\nPY\n    TENSOR_HANDLE_DATA_CC=\"$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/core/common_runtime/eager/tensor_handle_data.cc\"\n    TENSOR_HANDLE_DATA_CC=\"$TENSOR_HANDLE_DATA_CC\" python3 - <<'PY'\nimport os\nfrom pathlib import Path\n\npath = Path(os.environ[\"TENSOR_HANDLE_DATA_CC\"])\ntext = path.read_text(encoding=\"utf-8\")\ntext = text.replace('#include \"tensorflow/core/profiler/lib/traceme.h\"\\n', '', 1)\nold = '''    profiler::TraceMe activity(\n        [caller] { return absl::StrCat(caller, \" WaitReady\"); },\n\n        profiler::TraceMeLevel::kInfo);\n    DVLOG(3) << \"WaitReady: \" << caller << \" \" << this;\n'''\nnew = '''    DVLOG(3) << \"WaitReady: \" << caller << \" \" << this;\n'''\nif old in text:\n    text = text.replace(old, new, 1)\nelif '#include \"tensorflow/core/profiler/lib/traceme.h\"' in text:\n    raise SystemExit(f\"tensor_handle_data TraceMe block not found in {path}\")\npath.write_text(text, encoding=\"utf-8\")\nPY\nfi\nbazel build $BUILD_FLAGS \"${BAZEL_TARGETS[@]}\"\n"""
+
+    old = """# Build C API of TensorFlow itself including a target to generate ops for Java
+bazel build $BUILD_FLAGS \\
+    @org_tensorflow//tensorflow:tensorflow \\
+    @org_tensorflow//tensorflow/tools/lib_package:jnilicenses_generate \\
+    :java_proto_gen_sources \\
+    :java_op_generator \\
+    :java_api_import \\
+    :custom_ops_test
+"""
+    new = """# Build C API of TensorFlow itself. Android cross-builds reuse the checked-in
+# generated Java sources because the generator is a host tool that loads the
+# produced TensorFlow library at build time.
+BAZEL_TARGETS=(
+    @org_tensorflow//tensorflow:tensorflow
+    @org_tensorflow//tensorflow/tools/lib_package:jnilicenses_generate
+    :custom_ops_test
+)
+if [[ "${PLATFORM:-}" != "android-arm64" ]]; then
+    BAZEL_TARGETS+=(
+        :java_proto_gen_sources
+        :java_op_generator
+        :java_api_import
+    )
+else
+    bazel fetch "${BAZEL_TARGETS[@]}"
+    BAZEL_OUTPUT_BASE="$(bazel info output_base)"
+    TF_C_BUILD_FILE="$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/c/BUILD"
+    TF_C_BUILD_FILE="$TF_C_BUILD_FILE" python3 - <<'PY'
+import os
+from pathlib import Path
+
+path = Path(os.environ["TF_C_BUILD_FILE"])
+text = path.read_text(encoding="utf-8")
+
+replacements = [
+    (
+        '''tf_cuda_library(
+    name = "tf_status_internal",
+    hdrs = [
+        "tf_status.h",
+        "tf_status_internal.h",
+    ],
+    visibility = [
+        "//tensorflow/c:__subpackages__",
+    ],
+    deps = select({
+        "//tensorflow:android": [
+            "//tensorflow/core:android_tensorflow_lib_lite",
+        ],
+        "//conditions:default": [
+            "//tensorflow/core:lib",
+        ],
+    }),
+)''',
+        '''tf_cuda_library(
+    name = "tf_status_internal",
+    hdrs = [
+        "tf_status.h",
+        "tf_status_internal.h",
+    ],
+    visibility = [
+        "//tensorflow/c:__subpackages__",
+    ],
+    deps = select({
+        "//tensorflow:android": [
+            "//tensorflow/core:lib",
+        ],
+        "//conditions:default": [
+            "//tensorflow/core:lib",
+        ],
+    }),
+)''',
+        "tf_status_internal",
+    ),
+    (
+        '''cc_library(
+    name = "tf_status",
+    srcs = ["tf_status.cc"],
+    hdrs = ["tf_status.h"],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//tensorflow:android": [
+            "//tensorflow/core:android_tensorflow_lib_lite",
+        ],
+        "//conditions:default": [
+            ":tf_status_internal",
+            "//tensorflow/core:lib",
+        ],
+    }),
+)''',
+        '''cc_library(
+    name = "tf_status",
+    srcs = ["tf_status.cc"],
+    hdrs = ["tf_status.h"],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//tensorflow:android": [
+            ":tf_status_internal",
+            "//tensorflow/core:lib",
+        ],
+        "//conditions:default": [
+            ":tf_status_internal",
+            "//tensorflow/core:lib",
+        ],
+    }),
+)''',
+        "tf_status",
+    ),
+    (
+        '''cc_library(
+    name = "tf_datatype",
+    srcs = ["tf_datatype.cc"],
+    hdrs = ["tf_datatype.h"],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//tensorflow:android": [
+            "//tensorflow/core:android_tensorflow_lib_lite",  # TODO(annarev): exclude runtime srcs
+        ],
+        "//conditions:default": [
+            "//tensorflow/core:framework",
+        ],
+    }),
+    alwayslink = 1,
+)''',
+        '''cc_library(
+    name = "tf_datatype",
+    srcs = ["tf_datatype.cc"],
+    hdrs = ["tf_datatype.h"],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//tensorflow:android": [
+            "//tensorflow/core:framework",
+        ],
+        "//conditions:default": [
+            "//tensorflow/core:framework",
+        ],
+    }),
+    alwayslink = 1,
+)''',
+        "tf_datatype",
+    ),
+    (
+        '''cc_library(
+    name = "tf_tensor",
+    srcs = ["tf_tensor.cc"],
+    hdrs = ["tf_tensor.h"],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//tensorflow:android": [
+            "//tensorflow/core:android_tensorflow_lib_lite",
+        ],
+        "//conditions:default": [
+            ":tf_datatype",
+            ":tf_status",
+            ":tf_status_helper",
+            ":tf_tensor_internal",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:lib",
+            "//tensorflow/core:protos_all_cc",
+        ],
+    }),
+)''',
+        '''cc_library(
+    name = "tf_tensor",
+    srcs = [
+        "tf_tensor.cc",
+        "tf_datatype.h",
+        "tf_status.h",
+        "tf_status_helper.h",
+        "tf_tensor_internal.h",
+    ],
+    hdrs = ["tf_tensor.h"],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//tensorflow:android": [
+            ":tf_datatype",
+            ":tf_status",
+            ":tf_status_helper",
+            ":tf_tensor_internal",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:lib",
+            "//tensorflow/core:protos_all_cc",
+        ],
+        "//conditions:default": [
+            ":tf_datatype",
+            ":tf_status",
+            ":tf_status_helper",
+            ":tf_tensor_internal",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:lib",
+            "//tensorflow/core:protos_all_cc",
+        ],
+    }),
+)''',
+        "tf_tensor",
+    ),
+    (
+        '''tf_cuda_library(
+    name = "tf_tensor_internal",
+    hdrs = [
+        "tf_tensor.h",
+        "tf_tensor_internal.h",
+    ],
+    visibility = ["//tensorflow/c:__subpackages__"],
+    deps = select({
+        "//tensorflow:android": [
+            "//tensorflow/core:android_tensorflow_lib_lite",
+        ],
+        "//conditions:default": [
+            ":tf_datatype",
+            ":tf_status",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:protos_all_cc",
+        ],
+    }),
+)''',
+        '''tf_cuda_library(
+    name = "tf_tensor_internal",
+    hdrs = [
+        "tf_tensor.h",
+        "tf_tensor_internal.h",
+    ],
+    visibility = ["//tensorflow/c:__subpackages__"],
+    deps = select({
+        "//tensorflow:android": [
+            ":tf_datatype",
+            ":tf_status",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:protos_all_cc",
+        ],
+        "//conditions:default": [
+            ":tf_datatype",
+            ":tf_status",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:protos_all_cc",
+        ],
+    }),
+)''',
+        "tf_tensor_internal",
+    ),
+]
+
+for old, new, name in replacements:
+    if old in text:
+        text = text.replace(old, new, 1)
+    elif new not in text:
+        raise SystemExit(f"{name} android deps not found in {path}")
+
+path.write_text(text, encoding="utf-8")
+PY
+
+    EAGER_BUILD_FILE="$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/core/common_runtime/eager/BUILD"
+    EAGER_BUILD_FILE="$EAGER_BUILD_FILE" python3 - <<'PY'
+import os
+from pathlib import Path
+
+path = Path(os.environ["EAGER_BUILD_FILE"])
+text = path.read_text(encoding="utf-8")
+rule_name = 'name = "tensor_handle_data"'
+rule_start = text.find(rule_name)
+if rule_start == -1:
+    raise SystemExit(f"tensor_handle_data rule not found in {path}")
+rule_end = text.find('\n)\n', rule_start)
+if rule_end == -1:
+    raise SystemExit(f"tensor_handle_data rule end not found in {path}")
+rule_end += 3
+rule = text[rule_start:rule_end]
+old = '''        "//tensorflow:android": [
+            "//tensorflow/core:android_tensorflow_lib_lite",
+        ],'''
+new = '''        "//tensorflow:android": [
+            "@com_google_absl//absl/types:variant",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:lib",
+            "//tensorflow/core/profiler/lib:traceme",
+        ],'''
+if old in rule:
+    rule = rule.replace(old, new, 1)
+elif new not in rule:
+    raise SystemExit(f"tensor_handle_data android deps not found in {path}")
+text = text[:rule_start] + rule + text[rule_end:]
+path.write_text(text, encoding="utf-8")
+PY
+
+    TENSOR_HANDLE_DATA_CC="$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/core/common_runtime/eager/tensor_handle_data.cc"
+    TENSOR_HANDLE_DATA_CC="$TENSOR_HANDLE_DATA_CC" python3 - <<'PY'
+import os
+from pathlib import Path
+
+path = Path(os.environ["TENSOR_HANDLE_DATA_CC"])
+text = path.read_text(encoding="utf-8")
+text = text.replace('#include "tensorflow/core/profiler/lib/traceme.h"\n', '', 1)
+old = '''    profiler::TraceMe activity(
+        [caller] { return absl::StrCat(caller, " WaitReady"); },
+
+        profiler::TraceMeLevel::kInfo);
+    DVLOG(3) << "WaitReady: " << caller << " " << this;
+'''
+new = '''    DVLOG(3) << "WaitReady: " << caller << " " << this;
+'''
+if old in text:
+    text = text.replace(old, new, 1)
+elif '#include "tensorflow/core/profiler/lib/traceme.h"' in text:
+    raise SystemExit(f"tensor_handle_data TraceMe block not found in {path}")
+path.write_text(text, encoding="utf-8")
+PY
+fi
+bazel build $BUILD_FLAGS "${BAZEL_TARGETS[@]}"
+"""
     text = replace_once(text, old, new, path)
-    old = """GEN_SRCS_DIR=src/gen/java\nmkdir -p $GEN_SRCS_DIR\n\n# Generate Java operator wrappers\n$BAZEL_BIN/java_op_generator \\\n    --output_dir=$GEN_SRCS_DIR \\\n    --api_dirs=$BAZEL_SRCS/external/org_tensorflow/tensorflow/core/api_def/base_api,src/bazel/api_def \\\n    $TENSORFLOW_LIB\n\n# Copy generated Java protos from source jars\n"""
-    new = """GEN_SRCS_DIR=src/gen/java\nmkdir -p $GEN_SRCS_DIR\n\nif [[ \"${PLATFORM:-}\" != \"android-arm64\" ]]; then\n    # Generate Java operator wrappers\n    $BAZEL_BIN/java_op_generator \\\n        --output_dir=$GEN_SRCS_DIR \\\n        --api_dirs=$BAZEL_SRCS/external/org_tensorflow/tensorflow/core/api_def/base_api,src/bazel/api_def \\\n        $TENSORFLOW_LIB\nelse\n    echo \"Skipping Java source generation for android-arm64; reusing checked-in generated sources.\"\nfi\n\n# Copy generated Java protos from source jars\n"""
+
+    old = """GEN_SRCS_DIR=src/gen/java
+mkdir -p $GEN_SRCS_DIR
+
+# Generate Java operator wrappers
+$BAZEL_BIN/java_op_generator \\
+    --output_dir=$GEN_SRCS_DIR \\
+    --api_dirs=$BAZEL_SRCS/external/org_tensorflow/tensorflow/core/api_def/base_api,src/bazel/api_def \\
+    $TENSORFLOW_LIB
+
+# Copy generated Java protos from source jars
+"""
+    new = """GEN_SRCS_DIR=src/gen/java
+mkdir -p $GEN_SRCS_DIR
+
+if [[ "${PLATFORM:-}" != "android-arm64" ]]; then
+    # Generate Java operator wrappers
+    $BAZEL_BIN/java_op_generator \\
+        --output_dir=$GEN_SRCS_DIR \\
+        --api_dirs=$BAZEL_SRCS/external/org_tensorflow/tensorflow/core/api_def/base_api,src/bazel/api_def \\
+        $TENSORFLOW_LIB
+else
+    echo "Skipping Java source generation for android-arm64; reusing checked-in generated sources."
+fi
+
+# Copy generated Java protos from source jars
+"""
     text = replace_once(text, old, new, path)
     path.write_text(text, encoding="utf-8")
 
