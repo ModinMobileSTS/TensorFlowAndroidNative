@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import re
 import sys
 from pathlib import Path
 
@@ -1337,8 +1338,8 @@ TENSORFLOW_FRAMEWORK_ANDROID_PATCH = """--- a/tensorflow/BUILD
 ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +++ b/tensorflow/core/BUILD
 @@ -1378,7 +1378,7 @@
- # --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
- cc_library(
+# --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+cc_library(
      name = "portable_tensorflow_lib_lite",
 -    srcs = if_mobile([":mobile_srcs"]),
 +    srcs = if_ios([":mobile_srcs"]),
@@ -1409,9 +1410,68 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +            "@com_google_protobuf//:protobuf",
 +        ],
 +    }),
-     alwayslink = 1,
- )
+    alwayslink = 1,
+)
 """
+
+
+HUNK_HEADER_RE = re.compile(
+    r"^@@ -(?P<old_start>\d+)(?:,(?P<old_count>\d+))? "
+    r"\+(?P<new_start>\d+)(?:,(?P<new_count>\d+))? @@(?P<section>.*)$"
+)
+
+
+def normalize_unified_diff_hunk_counts(text: str) -> str:
+    lines = text.splitlines(keepends=True)
+    normalized: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        match = HUNK_HEADER_RE.match(line.rstrip("\r\n"))
+        if not match:
+            normalized.append(line)
+            i += 1
+            continue
+
+        old_count = 0
+        new_count = 0
+        j = i + 1
+        while j < len(lines):
+            body_line = lines[j]
+            if body_line.startswith(("--- ", "+++ ", "@@ ")):
+                break
+            if body_line.startswith("diff --git "):
+                break
+
+            prefix = body_line[:1]
+            if prefix == " ":
+                old_count += 1
+                new_count += 1
+            elif prefix == "-":
+                old_count += 1
+            elif prefix == "+":
+                new_count += 1
+            elif prefix == "\\":
+                pass
+            else:
+                break
+            j += 1
+
+        newline = "\r\n" if line.endswith("\r\n") else "\n"
+        normalized.append(
+            "@@ -{old_start},{old_count} +{new_start},{new_count} @@{section}{newline}".format(
+                old_start=match.group("old_start"),
+                old_count=old_count,
+                new_start=match.group("new_start"),
+                new_count=new_count,
+                section=match.group("section"),
+                newline=newline,
+            )
+        )
+        normalized.extend(lines[i + 1 : j])
+        i = j
+
+    return "".join(normalized)
 
 
 def write_tensorflow_android_absl_patch(path: Path) -> None:
@@ -1441,6 +1501,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     text += ANDROID_PORTABLE_LIB_SHIM_PATCH
+    text = normalize_unified_diff_hunk_counts(text)
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
