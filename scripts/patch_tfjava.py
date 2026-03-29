@@ -1346,7 +1346,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      copts = tf_copts(android_optimization_level_override = None) + tf_opts_nortti_if_lite_protos() + if_ios(["-Os"]),
      defines = ["SUPPORT_SELECTIVE_REGISTRATION"] + tf_portable_full_lite_protos(
          full = [],
-@@ -1390,11 +1390,22 @@
+@@ -1390,9 +1390,21 @@
          "notap",
      ],
      visibility = ["//visibility:public"],
@@ -1366,15 +1366,15 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +    ]) + select({
 +        "//tensorflow:android": [],
 +        "//conditions:default": [
-+        ":protos_all_cc_impl",
-+        "//tensorflow/core/util:stats_calculator_portable",
-+        "//tensorflow/core:mobile_additional_lib_deps",
++            ":protos_all_cc_impl",
++            "//tensorflow/core/util:stats_calculator_portable",
++            "//tensorflow/core:mobile_additional_lib_deps",
 +        ],
 +    }) + tf_portable_deps_no_runtime(),
      alwayslink = 1,
  )
  
-@@ -1485,7 +1492,7 @@
+@@ -1485,7 +1497,7 @@
  
  cc_library(
      name = "portable_tensorflow_lib",
@@ -1383,7 +1383,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      copts = tf_copts() + tf_opts_nortti_if_lite_protos(),
      features = tf_features_nomodules_if_mobile(),
      tags = [
-@@ -1493,12 +1500,16 @@
+@@ -1493,12 +1505,21 @@
          "notap",
      ],
      visibility = ["//visibility:public"],
@@ -1410,8 +1410,8 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +            "@com_google_protobuf//:protobuf",
 +        ],
 +    }),
-    alwayslink = 1,
-)
+     alwayslink = 1,
+ )
 """
 
 
