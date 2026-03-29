@@ -946,6 +946,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
  )
  
 @@ -1485,7 +1499,10 @@
+ 
  cc_library(
      name = "portable_tensorflow_lib",
 -    srcs = if_mobile([":portable_op_registrations_and_gradients"]),
@@ -957,7 +958,6 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      features = tf_features_nomodules_if_mobile(),
      tags = [
 @@ -1493,13 +1510,18 @@
-         "manual",
          "notap",
      ],
      visibility = ["//visibility:public"],
