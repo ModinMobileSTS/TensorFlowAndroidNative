@@ -1449,10 +1449,13 @@ PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
 
 PORTABLE_KERNELS_FUNCTION_OPS_DEDUP_PATCH = """--- a/tensorflow/core/kernels/BUILD
 +++ b/tensorflow/core/kernels/BUILD
-@@ -6397,8 +6397,6 @@
+@@ -6394,12 +6394,6 @@
+-        "dense_update_functor.cc",
+-        "dense_update_functor.h",
+         "dense_update_ops.cc",
          "example_parsing_ops.cc",
-         "fill_functor.cc",
-         "fill_functor.h",
+-        "fill_functor.cc",
+-        "fill_functor.h",
 -        "function_ops.cc",
 -        "function_ops.h",
          "gather_functor.h",
