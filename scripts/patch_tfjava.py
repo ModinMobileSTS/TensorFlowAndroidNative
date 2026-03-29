@@ -1415,6 +1415,26 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 """
 
 
+PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
++++ b/tensorflow/core/kernels/BUILD
+@@ -6947,13 +6947,14 @@
+     ],
+     visibility = ["//visibility:public"],
+     deps = [
+         "//tensorflow/core:portable_tensorflow_lib_lite",
+         "//tensorflow/core:protos_all_cc_impl",
++        ":padding_fifo_queue",
+         "//third_party/eigen3",
+         "//third_party/fft2d:fft2d_headers",
+         "@com_google_absl//absl/base",
+         "@com_google_protobuf//:protobuf",
+         "@fft2d",
+         "@gemmlowp",
+     ],
+     alwayslink = 1,
+"""
+
+
 HUNK_HEADER_RE = re.compile(
     r"^@@ -(?P<old_start>\d+)(?:,(?P<old_count>\d+))? "
     r"\+(?P<new_start>\d+)(?:,(?P<new_count>\d+))? @@(?P<section>.*)$"
@@ -1501,6 +1521,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     text += normalize_unified_diff_hunk_counts(ANDROID_PORTABLE_LIB_SHIM_PATCH)
+    text += PORTABLE_KERNELS_QUEUE_DEPS_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
