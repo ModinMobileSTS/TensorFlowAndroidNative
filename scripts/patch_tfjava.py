@@ -61,7 +61,7 @@ if [[ "${PLATFORM:-}" == "android-arm64" ]]; then
     printf 'INPUT(-lc)\\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/librt.so"
     # tfjava builds TensorFlow as an external Bazel repository, so TensorFlow's
     # own .bazelrc does not inject framework_shared_object=true for us.
-    export BUILD_FLAGS="--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog"
+    export BUILD_FLAGS="--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog --linkopt=-Wl,--allow-multiple-definition"
     export PYTHON_BIN_PATH=$(which python3)
 elif [[ -d $BAZEL_VC ]]; then
     # Work around compiler issues on Windows documented mainly in configure.py but also elsewhere
@@ -1417,15 +1417,13 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 
 PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
 +++ b/tensorflow/core/kernels/BUILD
-@@ -6947,13 +6947,29 @@
+@@ -6947,13 +6947,27 @@
      ],
      visibility = ["//visibility:public"],
      deps = [
          "//tensorflow/core:portable_tensorflow_lib_lite",
          "//tensorflow/core:protos_all_cc_impl",
 +        ":eigen_helpers",
-+        ":fill_functor",
-+        ":dense_update_functor",
 +        ":image_resizer_state",
 +        ":ops_util",
 +        ":padding_fifo_queue",
@@ -1448,23 +1446,6 @@ PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
      ],
      alwayslink = 1,
 """
-
-PORTABLE_KERNELS_FUNCTION_OPS_DEDUP_PATCH = """--- a/tensorflow/core/kernels/BUILD
-+++ b/tensorflow/core/kernels/BUILD
-@@ -6394,12 +6394,6 @@
--        "dense_update_functor.cc",
--        "dense_update_functor.h",
-         "dense_update_ops.cc",
-         "example_parsing_ops.cc",
--        "fill_functor.cc",
--        "fill_functor.h",
--        "function_ops.cc",
--        "function_ops.h",
-         "gather_functor.h",
-         "gather_functor_batched.h",
-         "gather_nd_op.cc",
-"""
-
 
 HUNK_HEADER_RE = re.compile(
     r"^@@ -(?P<old_start>\d+)(?:,(?P<old_count>\d+))? "
@@ -1553,7 +1534,6 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     text += normalize_unified_diff_hunk_counts(ANDROID_PORTABLE_LIB_SHIM_PATCH)
     text += PORTABLE_KERNELS_QUEUE_DEPS_PATCH
-    text += PORTABLE_KERNELS_FUNCTION_OPS_DEDUP_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
