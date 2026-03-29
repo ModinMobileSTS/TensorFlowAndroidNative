@@ -568,6 +568,21 @@ TF_C_BUILD_ANDROID_FULL_DEPS_PATCH = """--- a/tensorflow/c/BUILD
          "//conditions:default": [
              "//tensorflow/core:framework",
          ],
+@@ -253,7 +253,13 @@
+ 
+ cc_library(
+     name = "tf_tensor",
+-    srcs = ["tf_tensor.cc"],
++    srcs = [
++        "tf_tensor.cc",
++        "tf_datatype.h",
++        "tf_status.h",
++        "tf_status_helper.h",
++        "tf_tensor_internal.h",
++    ],
+     hdrs = ["tf_tensor.h"],
+     visibility = ["//visibility:public"],
+     deps = select({
 @@ -258,7 +280,13 @@ cc_library(
      visibility = ["//visibility:public"],
      deps = select({
