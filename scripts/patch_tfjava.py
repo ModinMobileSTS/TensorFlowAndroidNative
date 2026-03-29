@@ -905,7 +905,7 @@ TENSORFLOW_FRAMEWORK_ANDROID_PATCH = """--- a/tensorflow/BUILD
 
 ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +++ b/tensorflow/core/BUILD
-@@ -1378,7 +1378,10 @@
+@@ -1379,7 +1379,10 @@
  cc_library(
      name = "portable_tensorflow_lib_lite",
 -    srcs = if_mobile([":mobile_srcs"]),
@@ -916,7 +916,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      copts = tf_copts(android_optimization_level_override = None) + tf_opts_nortti_if_lite_protos() + if_ios(["-Os"]),
      defines = ["SUPPORT_SELECTIVE_REGISTRATION"] + tf_portable_full_lite_protos(
          full = [],
-@@ -1390,11 +1393,22 @@
+@@ -1390,10 +1393,21 @@
          "notap",
      ],
      visibility = ["//visibility:public"],
@@ -943,7 +943,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +    }),
      alwayslink = 1,
  )
-@@ -1485,7 +1499,10 @@
+@@ -1486,6 +1489,9 @@
  cc_library(
      name = "portable_tensorflow_lib",
 -    srcs = if_mobile([":portable_op_registrations_and_gradients"]),
@@ -954,7 +954,8 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      copts = tf_copts() + tf_opts_nortti_if_lite_protos(),
      features = tf_features_nomodules_if_mobile(),
      tags = [
-@@ -1494,12 +1511,16 @@
+@@ -1492,13 +1498,18 @@
+         "manual",
          "notap",
      ],
      visibility = ["//visibility:public"],
