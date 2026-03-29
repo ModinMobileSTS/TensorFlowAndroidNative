@@ -1417,7 +1417,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 
 PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
 +++ b/tensorflow/core/kernels/BUILD
-@@ -6947,13 +6947,21 @@
+@@ -6947,13 +6947,22 @@
      ],
      visibility = ["//visibility:public"],
      deps = [
@@ -1431,6 +1431,7 @@ PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
 +        ":padding_fifo_queue",
 +        ":pooling_ops",
 +        ":quantization_utils",
++        "//tensorflow/core/profiler/lib:traceme",
          "//third_party/eigen3",
          "//third_party/fft2d:fft2d_headers",
          "@com_google_absl//absl/base",
