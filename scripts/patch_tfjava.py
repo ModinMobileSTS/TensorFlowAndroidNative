@@ -914,7 +914,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      copts = tf_copts(android_optimization_level_override = None) + tf_opts_nortti_if_lite_protos() + if_ios(["-Os"]),
      defines = ["SUPPORT_SELECTIVE_REGISTRATION"] + tf_portable_full_lite_protos(
          full = [],
-@@ -1390,11 +1390,18 @@
+@@ -1390,11 +1390,19 @@
          "notap",
      ],
      visibility = ["//visibility:public"],
@@ -948,7 +948,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      copts = tf_copts() + tf_opts_nortti_if_lite_protos(),
      features = tf_features_nomodules_if_mobile(),
      tags = [
-@@ -1493,13 +1500,13 @@
+@@ -1493,12 +1500,13 @@
          "notap",
      ],
      visibility = ["//visibility:public"],
