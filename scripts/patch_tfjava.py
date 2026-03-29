@@ -1395,11 +1395,20 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 -    ],
 +    deps = [
 +        ":portable_tensorflow_lib_lite",
-+        ":protos_all_cc_impl",
-+        "//tensorflow/core/kernels:portable_tensorflow_kernels",
-+        "//third_party/eigen3",
-+        "@com_google_protobuf//:protobuf",
-+    ],
++    ] + select({
++        "//tensorflow:android": [
++            ":protos_all_cc_impl",
++            "//tensorflow/core/kernels:portable_tensorflow_kernels",
++            "//third_party/eigen3",
++            "@com_google_protobuf//:protobuf",
++        ],
++        "//conditions:default": [
++            ":protos_all_cc_impl",
++            "//tensorflow/core/kernels:portable_tensorflow_kernels",
++            "//third_party/eigen3",
++            "@com_google_protobuf//:protobuf",
++        ],
++    }),
      alwayslink = 1,
  )
 """
