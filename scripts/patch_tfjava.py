@@ -36,10 +36,10 @@ def patch_build_sh(path: Path) -> None:
     new = """# Allows us to use ccache with Bazel on Mac, but Android needs Bazel's Android crosstool.\nif [[ \"${PLATFORM:-}\" != \"android-arm64\" ]]; then\n    export BAZEL_USE_CPP_ONLY_TOOLCHAIN=1\nfi\n\nexport BAZEL_VC=\"${VCINSTALLDIR:-}\"\nif [[ \"${PLATFORM:-}\" == \"android-arm64\" ]]; then\n    export TF_ANDROID_COMPAT_LIB_DIR=\"$(pwd)/android-compat-libs\"\n    mkdir -p \"${TF_ANDROID_COMPAT_LIB_DIR}\"\n    printf 'INPUT(-lc)\\n' > \"${TF_ANDROID_COMPAT_LIB_DIR}/libpthread.so\"\n    printf 'INPUT(-lc)\\n' > \"${TF_ANDROID_COMPAT_LIB_DIR}/librt.so\"\n    # tfjava builds TensorFlow as an external Bazel repository, so TensorFlow's\n    # own .bazelrc does not inject framework_shared_object=true for us.\n    export BUILD_FLAGS=\"--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog\"\n    export PYTHON_BIN_PATH=$(which python3)\nelif [[ -d $BAZEL_VC ]]; then\n    # Work around compiler issues on Windows documented mainly in configure.py but also elsewhere\n    export BUILD_FLAGS=\"--copt=//arch:AVX `#--copt=//arch:AVX2` --copt=-DWIN32_LEAN_AND_MEAN --host_copt=-DWIN32_LEAN_AND_MEAN --copt=-DNOGDI --host_copt=-DNOGDI --copt=-D_USE_MATH_DEFINES --host_copt=-D_USE_MATH_DEFINES --define=override_eigen_strong_inline=true\"\n    # https://software.intel.com/en-us/articles/intel-optimization-for-tensorflow-installation-guide#wind_B_S\n    export PATH=$PATH:$(pwd)/bazel-tensorflow-core-api/external/mkl_windows/lib/\n    export PYTHON_BIN_PATH=$(which python.exe)\nelse\n    export BUILD_FLAGS=\"--copt=-msse4.1 --copt=-msse4.2 --copt=-mavx `#--copt=-mavx2 --copt=-mfma` --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --linkopt=-lstdc++ --host_linkopt=-lstdc++\"\n    export PYTHON_BIN_PATH=$(which python3)\nfi\n\nif [[ -n \"${BAZEL_REPOSITORY_CACHE:-}\" ]]; then\n    export BUILD_FLAGS=\"$BUILD_FLAGS --repository_cache=${BAZEL_REPOSITORY_CACHE}\"\nfi\nif [[ -n \"${BAZEL_DISK_CACHE:-}\" ]]; then\n    export BUILD_FLAGS=\"$BUILD_FLAGS --disk_cache=${BAZEL_DISK_CACHE}\"\nfi\n"""
     text = replace_once(text, old, new, path)
     old = """# Build C API of TensorFlow itself including a target to generate ops for Java\nbazel build $BUILD_FLAGS \\\n    @org_tensorflow//tensorflow:tensorflow \\\n    @org_tensorflow//tensorflow/tools/lib_package:jnilicenses_generate \\\n    :java_proto_gen_sources \\\n    :java_op_generator \\\n    :java_api_import \\\n    :custom_ops_test\n"""
-    new = """# Build C API of TensorFlow itself. Android cross-builds reuse the checked-in\n# generated Java sources because the generator is a host tool that loads the\n# produced TensorFlow library at build time.\nBAZEL_TARGETS=(\n    @org_tensorflow//tensorflow:tensorflow\n    @org_tensorflow//tensorflow/tools/lib_package:jnilicenses_generate\n    :java_proto_gen_sources\n    :custom_ops_test\n)\nif [[ \"${PLATFORM:-}\" != \"android-arm64\" ]]; then\n    BAZEL_TARGETS+=(\n        :java_op_generator\n        :java_api_import\n    )\nfi\nbazel build $BUILD_FLAGS \"${BAZEL_TARGETS[@]}\"\n"""
+    new = """# Build C API of TensorFlow itself. Android cross-builds reuse the checked-in\n# generated Java sources because the generator is a host tool that loads the\n# produced TensorFlow library at build time.\nBAZEL_TARGETS=(\n    @org_tensorflow//tensorflow:tensorflow\n    @org_tensorflow//tensorflow/tools/lib_package:jnilicenses_generate\n    :custom_ops_test\n)\nif [[ \"${PLATFORM:-}\" != \"android-arm64\" ]]; then\n    BAZEL_TARGETS+=(\n        :java_proto_gen_sources\n        :java_op_generator\n        :java_api_import\n    )\nfi\nbazel build $BUILD_FLAGS \"${BAZEL_TARGETS[@]}\"\n"""
     text = replace_once(text, old, new, path)
     old = """GEN_SRCS_DIR=src/gen/java\nmkdir -p $GEN_SRCS_DIR\n\n# Generate Java operator wrappers\n$BAZEL_BIN/java_op_generator \\\n    --output_dir=$GEN_SRCS_DIR \\\n    --api_dirs=$BAZEL_SRCS/external/org_tensorflow/tensorflow/core/api_def/base_api,src/bazel/api_def \\\n    $TENSORFLOW_LIB\n\n# Copy generated Java protos from source jars\n"""
-    new = """GEN_SRCS_DIR=src/gen/java\nmkdir -p $GEN_SRCS_DIR\n\nif [[ \"${PLATFORM:-}\" != \"android-arm64\" ]]; then\n    # Generate Java operator wrappers\n    $BAZEL_BIN/java_op_generator \\\n        --output_dir=$GEN_SRCS_DIR \\\n        --api_dirs=$BAZEL_SRCS/external/org_tensorflow/tensorflow/core/api_def/base_api,src/bazel/api_def \\\n        $TENSORFLOW_LIB\nelse\n    echo \"Skipping java_op_generator for android-arm64; reusing checked-in generated sources.\"\nfi\n\n# Copy generated Java protos from source jars\n"""
+    new = """GEN_SRCS_DIR=src/gen/java\nmkdir -p $GEN_SRCS_DIR\n\nif [[ \"${PLATFORM:-}\" != \"android-arm64\" ]]; then\n    # Generate Java operator wrappers\n    $BAZEL_BIN/java_op_generator \\\n        --output_dir=$GEN_SRCS_DIR \\\n        --api_dirs=$BAZEL_SRCS/external/org_tensorflow/tensorflow/core/api_def/base_api,src/bazel/api_def \\\n        $TENSORFLOW_LIB\nelse\n    echo \"Skipping Java source generation for android-arm64; reusing checked-in generated sources.\"\nfi\n\n# Copy generated Java protos from source jars\n"""
     text = replace_once(text, old, new, path)
     path.write_text(text, encoding="utf-8")
 
@@ -914,7 +914,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      copts = tf_copts(android_optimization_level_override = None) + tf_opts_nortti_if_lite_protos() + if_ios(["-Os"]),
      defines = ["SUPPORT_SELECTIVE_REGISTRATION"] + tf_portable_full_lite_protos(
          full = [],
-@@ -1390,11 +1390,19 @@
+@@ -1390,11 +1390,22 @@
          "notap",
      ],
      visibility = ["//visibility:public"],
@@ -931,11 +931,14 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +        ":lib",
 +        ":lib_internal",
 +        ":protos_all_cc",
-+    ]) + if_not_android([
++    ]) + select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
 +        ":protos_all_cc_impl",
 +        "//tensorflow/core/util:stats_calculator_portable",
 +        "//tensorflow/core:mobile_additional_lib_deps",
-+    ]) + tf_portable_deps_no_runtime(),
++        ],
++    }) + tf_portable_deps_no_runtime(),
      alwayslink = 1,
  )
  
@@ -948,7 +951,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
      copts = tf_copts() + tf_opts_nortti_if_lite_protos(),
      features = tf_features_nomodules_if_mobile(),
      tags = [
-@@ -1493,12 +1500,13 @@
+@@ -1493,12 +1500,16 @@
          "notap",
      ],
      visibility = ["//visibility:public"],
@@ -961,12 +964,15 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 -    ],
 +    deps = [
 +        ":portable_tensorflow_lib_lite",
-+    ] + if_not_android([
-+        ":protos_all_cc_impl",
-+        "//tensorflow/core/kernels:portable_tensorflow_kernels",
-+        "//third_party/eigen3",
-+        "@com_google_protobuf//:protobuf",
-+    ]),
++    ] + select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            ":protos_all_cc_impl",
++            "//tensorflow/core/kernels:portable_tensorflow_kernels",
++            "//third_party/eigen3",
++            "@com_google_protobuf//:protobuf",
++        ],
++    }),
      alwayslink = 1,
  )
 """
