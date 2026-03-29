@@ -1417,7 +1417,7 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 
 PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
 +++ b/tensorflow/core/kernels/BUILD
-@@ -6947,13 +6947,27 @@
+@@ -6947,13 +6947,28 @@
      ],
      visibility = ["//visibility:public"],
      deps = [
@@ -1437,6 +1437,7 @@ PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
 +        "//tensorflow/c:tf_datatype",
 +        "//tensorflow/c:tf_status",
 +        "//tensorflow/c:tf_tensor",
++        "//tensorflow/core/util/tensor_bundle",
          "//third_party/eigen3",
          "//third_party/fft2d:fft2d_headers",
          "@com_google_absl//absl/base",
