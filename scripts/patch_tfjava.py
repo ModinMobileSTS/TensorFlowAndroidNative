@@ -1417,13 +1417,15 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 
 PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
 +++ b/tensorflow/core/kernels/BUILD
-@@ -6947,13 +6947,27 @@
+@@ -6947,13 +6947,29 @@
      ],
      visibility = ["//visibility:public"],
      deps = [
          "//tensorflow/core:portable_tensorflow_lib_lite",
          "//tensorflow/core:protos_all_cc_impl",
 +        ":eigen_helpers",
++        ":fill_functor",
++        ":dense_update_functor",
 +        ":image_resizer_state",
 +        ":ops_util",
 +        ":padding_fifo_queue",
