@@ -906,9 +906,9 @@ TENSORFLOW_FRAMEWORK_ANDROID_PATCH = """--- a/tensorflow/BUILD
 ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +++ b/tensorflow/core/BUILD
 @@ -1378,7 +1378,10 @@
-# --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
-cc_library(
-    name = "portable_tensorflow_lib_lite",
+ # --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+ cc_library(
+     name = "portable_tensorflow_lib_lite",
 -    srcs = if_mobile([":mobile_srcs"]),
 +    srcs = select({
 +        "//tensorflow:android": [],
@@ -944,10 +944,10 @@ cc_library(
 +    }),
      alwayslink = 1,
  )
-
+ 
 @@ -1485,7 +1499,10 @@
-cc_library(
-    name = "portable_tensorflow_lib",
+ cc_library(
+     name = "portable_tensorflow_lib",
 -    srcs = if_mobile([":portable_op_registrations_and_gradients"]),
 +    srcs = select({
 +        "//tensorflow:android": [],
