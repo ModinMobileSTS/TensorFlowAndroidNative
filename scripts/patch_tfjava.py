@@ -56,8 +56,8 @@ export BAZEL_VC="${VCINSTALLDIR:-}"
 if [[ "${PLATFORM:-}" == "android-arm64" ]]; then
     export TF_ANDROID_COMPAT_LIB_DIR="$(pwd)/android-compat-libs"
     mkdir -p "${TF_ANDROID_COMPAT_LIB_DIR}"
-    printf 'INPUT(-lc)\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/libpthread.so"
-    printf 'INPUT(-lc)\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/librt.so"
+    printf 'INPUT(-lc)\\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/libpthread.so"
+    printf 'INPUT(-lc)\\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/librt.so"
     # tfjava builds TensorFlow as an external Bazel repository, so TensorFlow's
     # own .bazelrc does not inject framework_shared_object=true for us.
     export BUILD_FLAGS="--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog"
@@ -106,8 +106,8 @@ if [[ "${PLATFORM:-}" != "android-arm64" ]]; then
         :java_api_import
     )
 else
-    bazel fetch "${BAZEL_TARGETS[@]}"
-    BAZEL_OUTPUT_BASE="$(bazel info output_base)"
+    bazel build $BUILD_FLAGS --nobuild "${BAZEL_TARGETS[@]}"
+    BAZEL_OUTPUT_BASE="$(bazel info $BUILD_FLAGS output_base)"
     TF_C_BUILD_FILE="$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/c/BUILD"
     TF_C_BUILD_FILE="$TF_C_BUILD_FILE" python3 - <<'PY'
 import os
@@ -333,6 +333,11 @@ for old, new, name in replacements:
 path.write_text(text, encoding="utf-8")
 PY
 
+    sed -n '/name = "tf_status_internal"/,/^)/p' "$TF_C_BUILD_FILE"
+    echo '---'
+    sed -n '/name = "tf_tensor"/,/^)/p' "$TF_C_BUILD_FILE"
+    echo '---'
+
     EAGER_BUILD_FILE="$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/core/common_runtime/eager/BUILD"
     EAGER_BUILD_FILE="$EAGER_BUILD_FILE" python3 - <<'PY'
 import os
@@ -389,7 +394,7 @@ elif '#include "tensorflow/core/profiler/lib/traceme.h"' in text:
 path.write_text(text, encoding="utf-8")
 PY
 fi
-bazel build $BUILD_FLAGS "${BAZEL_TARGETS[@]}"
+bazel build $BUILD_FLAGS --nofetch "${BAZEL_TARGETS[@]}"
 """
     text = replace_once(text, old, new, path)
 
