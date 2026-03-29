@@ -344,7 +344,7 @@ rule_name = 'name = "tensor_handle_data"'
 rule_start = text.find(rule_name)
 if rule_start == -1:
     raise SystemExit(f"tensor_handle_data rule not found in {path}")
-rule_end = text.find('\n)\n', rule_start)
+rule_end = text.find('\\n)\\n', rule_start)
 if rule_end == -1:
     raise SystemExit(f"tensor_handle_data rule end not found in {path}")
 rule_end += 3
@@ -373,7 +373,7 @@ from pathlib import Path
 
 path = Path(os.environ["TENSOR_HANDLE_DATA_CC"])
 text = path.read_text(encoding="utf-8")
-text = text.replace('#include "tensorflow/core/profiler/lib/traceme.h"\n', '', 1)
+text = text.replace('#include "tensorflow/core/profiler/lib/traceme.h"\\n', '', 1)
 old = '''    profiler::TraceMe activity(
         [caller] { return absl::StrCat(caller, " WaitReady"); },
 
