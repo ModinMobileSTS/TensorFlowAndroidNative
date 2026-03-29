@@ -1450,6 +1450,19 @@ PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
      alwayslink = 1,
 """
 
+PORTABLE_KERNELS_FUNCTION_OPS_DEDUP_PATCH = """--- a/tensorflow/core/kernels/BUILD
++++ b/tensorflow/core/kernels/BUILD
+@@ -6397,8 +6397,6 @@
+         "example_parsing_ops.cc",
+         "fill_functor.cc",
+         "fill_functor.h",
+-        "function_ops.cc",
+-        "function_ops.h",
+         "gather_functor.h",
+         "gather_functor_batched.h",
+         "gather_nd_op.cc",
+"""
+
 
 HUNK_HEADER_RE = re.compile(
     r"^@@ -(?P<old_start>\d+)(?:,(?P<old_count>\d+))? "
@@ -1538,6 +1551,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     text += normalize_unified_diff_hunk_counts(ANDROID_PORTABLE_LIB_SHIM_PATCH)
     text += PORTABLE_KERNELS_QUEUE_DEPS_PATCH
+    text += PORTABLE_KERNELS_FUNCTION_OPS_DEDUP_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
