@@ -345,31 +345,63 @@ from pathlib import Path
 
 path = Path(os.environ["EAGER_BUILD_FILE"])
 text = path.read_text(encoding="utf-8")
-rule_name = 'name = "tensor_handle_data"'
-rule_start = text.find(rule_name)
-if rule_start == -1:
-    raise SystemExit(f"tensor_handle_data rule not found in {path}")
-rule_end = text.find('\\n)\\n', rule_start)
-if rule_end == -1:
-    raise SystemExit(f"tensor_handle_data rule end not found in {path}")
-rule_end += 3
-rule = text[rule_start:rule_end]
-old = '''        "//tensorflow:android": [
+
+
+def patch_rule(rule_name: str, old: str, new: str) -> None:
+    global text
+    marker = f'name = "{rule_name}"'
+    rule_start = text.find(marker)
+    if rule_start == -1:
+        raise SystemExit(f"{rule_name} rule not found in {path}")
+    rule_end = text.find('\\n)\\n', rule_start)
+    if rule_end == -1:
+        raise SystemExit(f"{rule_name} rule end not found in {path}")
+    rule_end += 3
+    rule = text[rule_start:rule_end]
+    if old in rule:
+        rule = rule.replace(old, new, 1)
+    elif new not in rule:
+        raise SystemExit(f"{rule_name} android deps not found in {path}")
+    text = text[:rule_start] + rule + text[rule_end:]
+
+
+patch_rule(
+    "tensor_handle_data",
+    '''        "//tensorflow:android": [
             "//tensorflow/core:android_tensorflow_lib_lite",
-        ],'''
-new = '''        "//tensorflow:android": [
+        ],''',
+    '''        "//tensorflow:android": [
             "@com_google_absl//absl/types:variant",
             "//tensorflow/core:framework",
             "//tensorflow/core:lib",
             "//tensorflow/core/profiler/lib:traceme",
-        ],'''
-if old in rule:
-    rule = rule.replace(old, new, 1)
-elif new not in rule:
-    raise SystemExit(f"tensor_handle_data android deps not found in {path}")
-text = text[:rule_start] + rule + text[rule_end:]
+        ],''',
+)
+
+patch_rule(
+    "kernel_and_device",
+    '''        "//tensorflow:android": [
+            "//tensorflow/core:android_tensorflow_lib_lite",
+        ],''',
+    '''        "//tensorflow:android": [
+            "//tensorflow/core:core_cpu_lib",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:framework_internal",
+            "//tensorflow/core:lib",
+            "//tensorflow/core:lib_internal",
+            "//tensorflow/core:protos_all_cc",
+            "//tensorflow/core/profiler/lib:annotated_traceme",
+            "//tensorflow/core/profiler/lib:traceme",
+        ],''',
+)
+
 path.write_text(text, encoding="utf-8")
 PY
+
+    sed -n '/name = "tensor_handle_data"/,/^)/p' "$EAGER_BUILD_FILE"
+    echo '---'
+    sed -n '/name = "kernel_and_device"/,/^)/p' "$EAGER_BUILD_FILE"
+    echo '---'
 
     TENSOR_HANDLE_DATA_CC="$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/core/common_runtime/eager/tensor_handle_data.cc"
     TENSOR_HANDLE_DATA_CC="$TENSOR_HANDLE_DATA_CC" python3 - <<'PY'
