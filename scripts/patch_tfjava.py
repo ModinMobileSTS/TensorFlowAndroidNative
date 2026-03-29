@@ -188,7 +188,40 @@ LLVM_ANDROID_CONFIG_PATCH = """--- a/third_party/llvm/llvm.bzl
 
 TFE_C_API_ANDROID_DEPS_PATCH = """--- a/tensorflow/c/eager/BUILD
 +++ b/tensorflow/c/eager/BUILD
-@@ -73,20 +73,24 @@
+@@ -37,7 +37,28 @@ tf_cuda_library(
+     visibility = ["//visibility:public"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "@com_google_absl//absl/algorithm:container",
++            "@com_google_absl//absl/container:fixed_array",
++            "//tensorflow/c:c_api",
++            "//tensorflow/c:c_api_internal",
++            "//tensorflow/c:tf_tensor_internal",
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core/common_runtime/eager:attr_builder",
++            "//tensorflow/core/common_runtime/eager:context",
++            "//tensorflow/core/common_runtime/eager:eager_executor",
++            "//tensorflow/core/common_runtime/eager:execute",
++            "//tensorflow/core/common_runtime/eager:kernel_and_device",
++            "//tensorflow/core/common_runtime/eager:tensor_handle",
++            "//tensorflow/core/common_runtime/eager:copy_to_device_node",
++            "//tensorflow/core:core_cpu_internal",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:framework_internal",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core/platform:casts",
++            "//tensorflow/core/platform:errors",
++            "//tensorflow/core:protos_all_cc",
++            "//tensorflow/core/profiler/lib:traceme",
++        ],
+         "//conditions:default": [
+             "@com_google_absl//absl/algorithm:container",
+             "@com_google_absl//absl/container:fixed_array",
+@@ -73,20 +94,24 @@ tf_cuda_library(
      }) + [
          "@com_google_absl//absl/memory",
          "//tensorflow/core/common_runtime/eager:eager_operation",
@@ -226,7 +259,36 @@ TFE_C_API_ANDROID_DEPS_PATCH = """--- a/tensorflow/c/eager/BUILD
      alwayslink = 1,
  )
  
-@@ -254,18 +258,22 @@
+@@ -221,7 +246,24 @@ tf_cuda_library(
+     visibility = ["//visibility:public"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            ":c_api",
++            ":c_api_internal",
++            "//tensorflow/c:c_api",
++            "//tensorflow/c:c_api_internal",
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core/common_runtime/eager:attr_builder",
++            "//tensorflow/core/common_runtime/eager:context",
++            "//tensorflow/core/common_runtime/eager:eager_executor",
++            "//tensorflow/core/common_runtime/eager:execute",
++            "//tensorflow/core/common_runtime/eager:kernel_and_device",
++            "//tensorflow/core/common_runtime/eager:tensor_handle",
++            "//tensorflow/core/common_runtime/eager:copy_to_device_node",
++            "//tensorflow/core:core_cpu_internal",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:framework_internal",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++        ],
+         "//conditions:default": [
+             ":c_api",
+             ":c_api_internal",
+@@ -254,18 +296,22 @@ tf_cuda_library(
          "@com_google_absl//absl/memory",
          "//tensorflow/c:tf_status_helper",
          "//tensorflow/core/common_runtime/eager:eager_operation",
@@ -265,42 +327,404 @@ TFE_C_API_ANDROID_DEPS_PATCH = """--- a/tensorflow/c/eager/BUILD
 
 EAGER_CONTEXT_ANDROID_DEPS_PATCH = """--- a/tensorflow/core/common_runtime/eager/BUILD
 +++ b/tensorflow/core/common_runtime/eager/BUILD
-@@ -55,27 +55,27 @@
+@@ -29,7 +29,12 @@ tf_cuda_library(
+     visibility = ["//tensorflow:internal"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "//tensorflow/core:core_cpu_lib",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:framework_internal",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++        ],
+         "//conditions:default": [
+             "//tensorflow/core:core_cpu_lib",
+             "//tensorflow/core:framework",
+@@ -55,14 +60,20 @@ tf_cuda_library(
          ":eager_executor",
          ":kernel_and_device",
          ":process_function_library_runtime",
 -        "//tensorflow/core/distributed_runtime/eager:remote_tensor_handle",
 -        "//tensorflow/core/distributed_runtime:rendezvous_mgr_interface",
 -        "//tensorflow/core/distributed_runtime:worker_env",
--    ] + select({
--        "//tensorflow:android": [
+     ] + select({
+         "//tensorflow:android": [
 -            "//tensorflow/core:android_tensorflow_lib_lite",
--        ],
--        "//conditions:default": [
-+    ] + select({
-+        "//tensorflow:android": [
-+            "//tensorflow/core:android_tensorflow_lib_lite",
-+        ],
-+        "//conditions:default": [
++            "//tensorflow/core:core_cpu_lib",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:framework_internal",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++            "//tensorflow/core:session_options",
+         ],
+         "//conditions:default": [
 +            "//tensorflow/core/distributed_runtime/eager:remote_tensor_handle",
 +            "//tensorflow/core/distributed_runtime:rendezvous_mgr_interface",
 +            "//tensorflow/core/distributed_runtime:worker_env",
              "//tensorflow/core:core_cpu_lib",
              "//tensorflow/core:framework",
              "//tensorflow/core:framework_internal",
-             "//tensorflow/core:lib",
-             "//tensorflow/core:lib_internal",
-             "//tensorflow/core:protos_all_cc",
-             "//tensorflow/core:session_options",
-             "//tensorflow/core/distributed_runtime:collective_param_resolver_distributed",
-             "//tensorflow/core/distributed_runtime:device_resolver_distributed",
-             "//tensorflow/core/distributed_runtime:rpc_collective_executor_mgr",
-             "//tensorflow/core/distributed_runtime:worker_cache",
-             "//tensorflow/core/distributed_runtime:server_lib",
-             "//tensorflow/core/distributed_runtime:worker_session",
-             "//tensorflow/core/distributed_runtime/eager:eager_client",
+@@ -115,7 +126,7 @@ tf_cuda_library(
+         "//tensorflow/core/platform:platform_port",
+     ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "//tensorflow/core:core_cpu_lib",
++        ],
+         "//conditions:default": [
+             "//tensorflow/core:core_cpu_lib",
          ],
-     }),
+@@ -137,7 +148,10 @@ tf_cuda_library(
+         ":eager_executor",
+     ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "@com_google_absl//absl/types:variant",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:lib",
++            "//tensorflow/core/profiler/lib:traceme",
++        ],
+         "//conditions:default": [
+             "@com_google_absl//absl/types:variant",
+             "//tensorflow/core:framework",
+@@ -164,7 +178,16 @@ tf_cuda_library(
+         ":tensor_handle_data",
+     ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "@com_google_absl//absl/strings",
++            "@com_google_absl//absl/types:variant",
++            "//tensorflow/core:core_cpu_lib",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:framework_internal",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++            "//tensorflow/core:session_options",
++            "//tensorflow/core/profiler/lib:traceme",
++        ],
+         "//conditions:default": [
+             "@com_google_absl//absl/strings",
+             "@com_google_absl//absl/types:variant",
+@@ -265,7 +288,7 @@ tf_cuda_library(
+         "@farmhash_archive//:farmhash",
+     ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            KERNEL_AND_DEVICE_DEPS,
++        ],
+         "//tensorflow:windows": KERNEL_AND_DEVICE_DEPS,
+         "//conditions:default": KERNEL_AND_DEVICE_DEPS + [
+             "//tensorflow/compiler/jit:xla_kernel_creator_util",
+@@ -285,7 +308,12 @@ tf_cuda_library(
+     visibility = ["//tensorflow:internal"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "@com_google_absl//absl/types:optional",
++            "//tensorflow/core:core_cpu_lib",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++        ],
+         "//conditions:default": [
+             "@com_google_absl//absl/types:optional",
+             "//tensorflow/core:core_cpu_lib",
+@@ -357,7 +385,12 @@ cc_library(
+         "//tensorflow/core/profiler/lib:traceme",
+     ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "//tensorflow/core:core_cpu_lib",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:framework_internal",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++        ],
+         "//conditions:default": [
+             "//tensorflow/core/distributed_runtime/eager:remote_mgr",
+             "//tensorflow/core:core_cpu_lib",
+@@ -434,7 +467,13 @@ tf_cuda_library(
+         "@farmhash_archive//:farmhash",
+     ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core:core_cpu_internal",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:framework_internal",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++        ],
+         "//conditions:default": [
+             "//tensorflow/core:core_cpu",
+             "//tensorflow/core:core_cpu_internal",
+"""
+
+
+TF_C_BUILD_ANDROID_FULL_DEPS_PATCH = """--- a/tensorflow/c/BUILD
++++ b/tensorflow/c/BUILD
+@@ -82,7 +82,12 @@ tf_cuda_library(
+     ],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            ":tf_attrtype",
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:lib",
++            "//tensorflow/core/platform:platform",
++            "//tensorflow/core:op_gen_lib",
++        ],
+         "//conditions:default": [
+             ":tf_attrtype",
+             "//tensorflow/core:core_cpu",
+@@ -162,7 +167,23 @@ tf_cuda_library(
+         ":tf_status_internal",
+     ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            ":tf_status",
++            ":tf_tensor",
++            "@com_google_absl//absl/strings",
++            "//tensorflow/cc/saved_model:loader_lite",
++            "//tensorflow/cc:gradients",
++            "//tensorflow/cc:ops",
++            "//tensorflow/cc:grad_ops",
++            "//tensorflow/cc:scope_internal",
++            "//tensorflow/cc:while_loop",
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core:core_cpu_internal",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:op_gen_lib",
++            "//tensorflow/core:protos_all_cc",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core/kernels:logging_ops",
++        ],
+         "//conditions:default": [
+             ":tf_status",
+             ":tf_tensor",
+@@ -199,7 +220,7 @@ tf_cuda_library(
+     ],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "//tensorflow/core:lib",
++        ],
+         "//conditions:default": [
+             "//tensorflow/core:lib",
+         ],
+@@ -214,7 +235,8 @@ cc_library(
+     visibility = ["//visibility:public"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            ":tf_status_internal",
++            "//tensorflow/core:lib",
++        ],
+         "//conditions:default": [
+             ":tf_status_internal",
+             "//tensorflow/core:lib",
+@@ -242,7 +264,7 @@ cc_library(
+     visibility = ["//visibility:public"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",  # TODO(annarev): exclude runtime srcs
+-        ],
++        "//tensorflow:android": [
++            "//tensorflow/core:framework",
++        ],
+         "//conditions:default": [
+             "//tensorflow/core:framework",
+         ],
+@@ -258,7 +280,13 @@ cc_library(
+     visibility = ["//visibility:public"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            ":tf_datatype",
++            ":tf_status",
++            ":tf_status_helper",
++            ":tf_tensor_internal",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:protos_all_cc",
++        ],
+         "//conditions:default": [
+             ":tf_datatype",
+             ":tf_status",
+@@ -281,7 +309,10 @@ tf_cuda_library(
+     visibility = ["//tensorflow/c:__subpackages__"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            ":tf_datatype",
++            ":tf_status",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:protos_all_cc",
++        ],
+         "//conditions:default": [
+             ":tf_datatype",
+             ":tf_status",
+@@ -387,7 +422,7 @@ tf_cuda_library(
+     visibility = ["//visibility:public"],
+     deps = select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "//tensorflow/core:framework",
++        ],
+         "//conditions:default": [
+             "//tensorflow/core:framework",
+         ],
+@@ -418,7 +453,9 @@ tf_cuda_library(
+     ] + select({
+         "//tensorflow:android": [
+             ":c_api_internal",
+-            "//tensorflow/core:android_tensorflow_lib_lite",
++            ":tf_tensor",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:framework_lite",
+         ],
+         "//conditions:default": [
+             ":c_api_internal",
+@@ -445,7 +482,7 @@ tf_cuda_library(
+         ":tf_status_helper",
+     ] + select({
+-        "//tensorflow:android": [
+-            "//tensorflow/core:android_tensorflow_lib_lite",
+-        ],
++        "//tensorflow:android": [
++            "//tensorflow/core:framework",
++        ],
+         "//conditions:default": [
+             "//tensorflow/core:framework",
+         ],
+"""
+
+
+DISTRIBUTED_EAGER_ANDROID_PATCH = """--- a/tensorflow/core/distributed_runtime/eager/BUILD
++++ b/tensorflow/core/distributed_runtime/eager/BUILD
+@@ -23,9 +23,12 @@ cc_library(
+
+ cc_library(
+     name = "cluster_function_library_runtime",
+-    srcs = [
+-        "cluster_function_library_runtime.cc",
+-    ],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "cluster_function_library_runtime.cc",
++        ],
++    }),
+     hdrs = [
+         "cluster_function_library_runtime.h",
+     ],
+@@ -71,7 +74,10 @@ cc_library(
+
+ cc_library(
+     name = "remote_execute_node",
+-    srcs = ["remote_execute_node.cc"],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": ["remote_execute_node.cc"],
++    }),
+     hdrs = ["remote_execute_node.h"],
+     deps = [
+         ":eager_client",
+@@ -90,7 +96,10 @@ cc_library(
+
+ cc_library(
+     name = "eager_service_impl",
+-    srcs = ["eager_service_impl.cc"],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": ["eager_service_impl.cc"],
++    }),
+     hdrs = [
+         "eager_service_impl.h",
+     ],
+@@ -154,9 +163,12 @@ tf_cc_test(
+
+ cc_library(
+     name = "remote_mgr",
+-    srcs = [
+-        "remote_mgr.cc",
+-    ],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "remote_mgr.cc",
++        ],
++    }),
+     hdrs = [
+         "remote_mgr.h",
+     ],
+@@ -185,7 +197,10 @@ tf_cc_test(
+
+ cc_library(
+     name = "remote_tensor_handle_data",
+-    srcs = ["remote_tensor_handle_data.cc"],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": ["remote_tensor_handle_data.cc"],
++    }),
+     hdrs = ["remote_tensor_handle_data.h"],
+     deps = [
+         ":destroy_tensor_handle_node",
+@@ -199,9 +214,12 @@ cc_library(
+
+ cc_library(
+     name = "remote_copy_node",
+-    srcs = [
+-        "remote_copy_node.cc",
+-    ],
++    srcs = select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            "remote_copy_node.cc",
++        ],
++    }),
+     hdrs = [
+         "remote_copy_node.h",
+     ],
 """
 
 
@@ -426,7 +850,8 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += LLVM_ANDROID_CONFIG_PATCH
     text += TFE_C_API_ANDROID_DEPS_PATCH
     text += EAGER_CONTEXT_ANDROID_DEPS_PATCH
-    text += TF_C_API_EXPERIMENTAL_BUILD_PATCH
+    text += TF_C_BUILD_ANDROID_FULL_DEPS_PATCH
+    text += DISTRIBUTED_EAGER_ANDROID_PATCH
     text += TF_C_API_EXPERIMENTAL_CC_PATCH
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
