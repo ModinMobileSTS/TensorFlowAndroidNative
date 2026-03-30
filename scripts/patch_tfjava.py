@@ -61,7 +61,7 @@ if [[ "${PLATFORM:-}" == "android-arm64" ]]; then
     printf 'INPUT(-lc)\\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/librt.so"
     # tfjava builds TensorFlow as an external Bazel repository, so TensorFlow's
     # own .bazelrc does not inject framework_shared_object=true for us.
-    export BUILD_FLAGS="--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog --linkopt=-Wl,--allow-multiple-definition"
+    export BUILD_FLAGS="--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog"
     export PYTHON_BIN_PATH=$(which python3)
 elif [[ -d $BAZEL_VC ]]; then
     # Work around compiler issues on Windows documented mainly in configure.py but also elsewhere
@@ -1337,24 +1337,13 @@ TENSORFLOW_FRAMEWORK_ANDROID_PATCH = """--- a/tensorflow/BUILD
 
 ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +++ b/tensorflow/core/BUILD
-@@ -1378,7 +1378,7 @@
- # --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
- cc_library(
-     name = "portable_tensorflow_lib_lite",
--    srcs = if_mobile([":mobile_srcs"]),
-+    srcs = if_ios([":mobile_srcs"]),
-     copts = tf_copts(android_optimization_level_override = None) + tf_opts_nortti_if_lite_protos() + if_ios(["-Os"]),
-     defines = ["SUPPORT_SELECTIVE_REGISTRATION"] + tf_portable_full_lite_protos(
-         full = [],
-@@ -1390,9 +1390,21 @@
-         "notap",
-     ],
-     visibility = ["//visibility:public"],
--    deps = [
--        ":protos_all_cc_impl",
--        "//tensorflow/core/util:stats_calculator_portable",
--        "//tensorflow/core:mobile_additional_lib_deps",
--    ] + tf_portable_deps_no_runtime(),
+@@ -1399,18 +1399,34 @@
+ )
+ 
+-alias(
++cc_library(
+     name = "android_tensorflow_lib_lite",
+-    actual = ":portable_tensorflow_lib_lite",
 +    deps = if_android([
 +        ":core_cpu",
 +        ":core_cpu_internal",
@@ -1366,85 +1355,50 @@ ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
 +    ]) + select({
 +        "//tensorflow:android": [],
 +        "//conditions:default": [
-+            ":protos_all_cc_impl",
-+            "//tensorflow/core/util:stats_calculator_portable",
-+            "//tensorflow/core:mobile_additional_lib_deps",
-+        ],
-+    }) + tf_portable_deps_no_runtime(),
-     alwayslink = 1,
- )
- 
-@@ -1485,7 +1497,7 @@
- 
- cc_library(
-     name = "portable_tensorflow_lib",
--    srcs = if_mobile([":portable_op_registrations_and_gradients"]),
-+    srcs = if_ios([":portable_op_registrations_and_gradients"]),
-     copts = tf_copts() + tf_opts_nortti_if_lite_protos(),
-     features = tf_features_nomodules_if_mobile(),
-     tags = [
-@@ -1493,12 +1505,21 @@
-         "notap",
-     ],
-     visibility = ["//visibility:public"],
--    deps = [
--        ":portable_tensorflow_lib_lite",
--        ":protos_all_cc_impl",
--        "//tensorflow/core/kernels:portable_tensorflow_kernels",
--        "//third_party/eigen3",
--        "@com_google_protobuf//:protobuf",
--    ],
-+    deps = [
-+        ":portable_tensorflow_lib_lite",
-+    ] + select({
-+        "//tensorflow:android": [
-+            ":protos_all_cc_impl",
-+            "//tensorflow/core/kernels:portable_tensorflow_kernels",
-+            "//third_party/eigen3",
-+            "@com_google_protobuf//:protobuf",
-+        ],
-+        "//conditions:default": [
-+            ":protos_all_cc_impl",
-+            "//tensorflow/core/kernels:portable_tensorflow_kernels",
-+            "//third_party/eigen3",
-+            "@com_google_protobuf//:protobuf",
++            ":portable_tensorflow_lib_lite",
 +        ],
 +    }),
-     alwayslink = 1,
- )
-"""
-
-
-PORTABLE_KERNELS_QUEUE_DEPS_PATCH = """--- a/tensorflow/core/kernels/BUILD
-+++ b/tensorflow/core/kernels/BUILD
-@@ -6947,13 +6947,27 @@
-     ],
      visibility = ["//visibility:public"],
-     deps = [
-         "//tensorflow/core:portable_tensorflow_lib_lite",
-         "//tensorflow/core:protos_all_cc_impl",
-+        ":eigen_helpers",
-+        ":image_resizer_state",
-+        ":ops_util",
-+        ":padding_fifo_queue",
-+        ":quantization_utils",
-+        "//tensorflow/core/profiler/lib:traceme",
-+        "//tensorflow/c:kernels",
-+        "//tensorflow/c:ops",
-+        "//tensorflow/c:tf_datatype",
-+        "//tensorflow/c:tf_status",
-+        "//tensorflow/c:tf_tensor",
-+        "//tensorflow/core/util/tensor_bundle",
-+        "//tensorflow/core/util/ctc:ctc_beam_search_lib",
-+        "//tensorflow/core/util/ctc:ctc_loss_calculator_lib",
-         "//third_party/eigen3",
-         "//third_party/fft2d:fft2d_headers",
-         "@com_google_absl//absl/base",
-         "@com_google_protobuf//:protobuf",
-         "@fft2d",
-         "@gemmlowp",
-     ],
-     alwayslink = 1,
++    alwayslink = 1,
+ )
+ 
+ alias(
+     name = "android_tensorflow_lib_lite_nortti",
+-    actual = ":portable_tensorflow_lib_lite",
++    actual = ":android_tensorflow_lib_lite",
+     visibility = ["//visibility:public"],
+ )
+ 
+ alias(
+     name = "android_tensorflow_lib_lite_nortti_lite_protos",
+-    actual = ":portable_tensorflow_lib_lite",
++    actual = ":android_tensorflow_lib_lite",
+     visibility = ["//visibility:public"],
+ )
+@@ -1478,9 +1494,22 @@
+ # Full TensorFlow library with operator support. Use this unless reducing
+ # binary size (by packaging a reduced operator set) is a concern.
+-alias(
++cc_library(
+     name = "android_tensorflow_lib",
+-    actual = ":portable_tensorflow_lib",
++    deps = if_android([
++        ":core_cpu",
++        ":core_cpu_internal",
++        ":framework",
++        ":framework_internal",
++        ":lib",
++        ":lib_internal",
++        ":protos_all_cc",
++    ]) + select({
++        "//tensorflow:android": [],
++        "//conditions:default": [
++            ":portable_tensorflow_lib",
++        ],
++    }),
+     visibility = ["//visibility:public"],
++    alwayslink = 1,
+ )
 """
 
 HUNK_HEADER_RE = re.compile(
@@ -1533,7 +1487,6 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     text += normalize_unified_diff_hunk_counts(ANDROID_PORTABLE_LIB_SHIM_PATCH)
-    text += PORTABLE_KERNELS_QUEUE_DEPS_PATCH
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
