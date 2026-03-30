@@ -331,12 +331,76 @@ for old, new, name in replacements:
     elif new not in text:
         raise SystemExit(f"{name} android deps not found in {path}")
 
+
+def replace_rule(rule_name: str, rule_kind: str, new_rule: str) -> None:
+    global text
+    marker = f'name = "{rule_name}"'
+    marker_pos = text.find(marker)
+    if marker_pos == -1:
+        raise SystemExit(f"{rule_name} rule not found in {path}")
+    rule_start = text.rfind(f"{rule_kind}(", 0, marker_pos)
+    if rule_start == -1:
+        raise SystemExit(f"{rule_name} {rule_kind} start not found in {path}")
+    rule_end = text.find('\\n)\\n', marker_pos)
+    if rule_end == -1:
+        raise SystemExit(f"{rule_name} rule end not found in {path}")
+    rule_end += 3
+    rule = text[rule_start:rule_end]
+    if rule != new_rule:
+        text = text[:rule_start] + new_rule + text[rule_end:]
+
+
+replace_rule(
+    "c_api_no_xla",
+    "tf_cuda_library",
+    '''tf_cuda_library(
+    name = "c_api_no_xla",
+    srcs = [
+        "c_api.cc",
+        "c_api_function.cc",
+        "//tensorflow/cc/saved_model:loader.h",
+    ],
+    hdrs = [
+        "c_api.h",
+    ],
+    copts = tf_copts(),
+    visibility = ["//tensorflow/c:__subpackages__"],
+    deps = [
+        ":c_api_internal",
+        ":tf_attrtype",
+        ":tf_datatype",
+        ":tf_status_internal",
+        ":tf_status",
+        ":tf_tensor",
+        "@com_google_absl//absl/strings",
+        "//tensorflow/cc/saved_model:loader",
+        "//tensorflow/cc/saved_model:loader_lite",
+        "//tensorflow/cc:gradients",
+        "//tensorflow/cc:ops",
+        "//tensorflow/cc:grad_ops",
+        "//tensorflow/cc:scope_internal",
+        "//tensorflow/cc:while_loop",
+        "//tensorflow/core:core_cpu",
+        "//tensorflow/core:core_cpu_internal",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:op_gen_lib",
+        "//tensorflow/core:protos_all_cc",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:lib_internal",
+        "//tensorflow/core/kernels:logging_ops",
+    ],
+    alwayslink = 1,
+)''',
+)
+
 path.write_text(text, encoding="utf-8")
 PY
 
     sed -n '/name = "tf_status_internal"/,/^)/p' "$TF_C_BUILD_FILE"
     echo '---'
     sed -n '/name = "tf_tensor"/,/^)/p' "$TF_C_BUILD_FILE"
+    echo '---'
+    sed -n '/name = "c_api_no_xla"/,/^)/p' "$TF_C_BUILD_FILE"
     echo '---'
 
     EAGER_BUILD_FILE="$BAZEL_OUTPUT_BASE/external/org_tensorflow/tensorflow/core/common_runtime/eager/BUILD"
