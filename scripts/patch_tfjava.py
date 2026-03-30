@@ -1315,92 +1315,60 @@ TF_C_API_SAVED_MODEL_ANDROID_PATCH = """--- a/tensorflow/c/c_api.cc
 # TF_LoadSessionFromSavedModel() once the mobile guard above is removed.
 SAVED_MODEL_ANDROID_LOADER_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
 +++ b/tensorflow/cc/saved_model/BUILD
-@@ -44,13 +44,20 @@
+@@ -6,6 +6,7 @@
+     "if_android",
+     "if_ios",
+     "if_mobile",
++    "if_not_android",
+     "if_not_mobile",
+     "tf_cc_test",
+ )
+@@ -44,12 +45,15 @@
      name = "reader",
      srcs = ["reader.cc"],
      hdrs = ["reader.h"],
 -    deps = [":constants"] + if_not_mobile([
--        # TODO(b/111634734): :lib and :protos_all contain dependencies that
--        # cannot be built on mobile platforms. Instead, include the appropriate
--        # tf_lib depending on the build platform.
--        "//tensorflow/core:lib",
--        "//tensorflow/core:protos_all_cc",
--    ]),
-+    deps = [":constants"] + select({
-+        "//tensorflow:android": [
-+            "//tensorflow/core:lib",
-+            "//tensorflow/core:protos_all_cc",
-+        ],
-+        "//tensorflow:mobile": [],
-+        "//conditions:default": [
-+            # TODO(b/111634734): :lib and :protos_all contain dependencies that
-+            # cannot be built on mobile platforms. Instead, include the appropriate
-+            # tf_lib depending on the build platform.
-+            "//tensorflow/core:lib",
-+            "//tensorflow/core:protos_all_cc",
-+        ],
-+    }),
++    deps = [":constants"] + if_not_android(if_not_mobile([
+         # TODO(b/111634734): :lib and :protos_all contain dependencies that
+         # cannot be built on mobile platforms. Instead, include the appropriate
+         # tf_lib depending on the build platform.
+         "//tensorflow/core:lib",
+         "//tensorflow/core:protos_all_cc",
++    ])) + if_android([
++        "//tensorflow/core:lib",
++        "//tensorflow/core:protos_all_cc",
+     ]),
  )
  
- tf_cc_test(
-@@ -94,11 +101,19 @@
+@@ -94,7 +98,11 @@
      hdrs = ["loader.h"],
      deps = if_static([
          ":loader_lite_impl",
 -    ]) + if_not_mobile([
--        "//tensorflow/core:core_cpu",
--        "//tensorflow/core:lib",
--        "//tensorflow/core:protos_all_cc",
--    ]),
-+    ]) + select({
-+        "//tensorflow:android": [
-+            "//tensorflow/core:core_cpu",
-+            "//tensorflow/core:lib",
-+            "//tensorflow/core:protos_all_cc",
-+        ],
-+        "//tensorflow:mobile": [],
-+        "//conditions:default": [
-+            "//tensorflow/core:core_cpu",
-+            "//tensorflow/core:lib",
-+            "//tensorflow/core:protos_all_cc",
-+        ],
-+    }),
- )
- 
- cc_library(
-@@ -108,14 +123,25 @@
++    ]) + if_not_android(if_not_mobile([
++        "//tensorflow/core:core_cpu",
++        "//tensorflow/core:lib",
++        "//tensorflow/core:protos_all_cc",
++    ])) + if_android([
+         "//tensorflow/core:core_cpu",
+         "//tensorflow/core:lib",
+         "//tensorflow/core:protos_all_cc",
+@@ -108,7 +116,14 @@
      deps = [
          ":constants",
          ":reader",
 -    ] + if_not_mobile([
--        "//tensorflow/core:core_cpu",
--        "//tensorflow/core:framework",
--        "//tensorflow/core:lib",
--        "//tensorflow/core:lib_internal",
--        "//tensorflow/core:protos_all_cc",
--        "//tensorflow/core/util/tensor_bundle:naming",
--    ]),
-+    ] + select({
-+        "//tensorflow:android": [
-+            "//tensorflow/core:core_cpu",
-+            "//tensorflow/core:framework",
-+            "//tensorflow/core:lib",
-+            "//tensorflow/core:lib_internal",
-+            "//tensorflow/core:protos_all_cc",
-+            "//tensorflow/core/util/tensor_bundle:naming",
-+        ],
-+        "//tensorflow:mobile": [],
-+        "//conditions:default": [
-+            "//tensorflow/core:core_cpu",
-+            "//tensorflow/core:framework",
-+            "//tensorflow/core:lib",
-+            "//tensorflow/core:lib_internal",
-+            "//tensorflow/core:protos_all_cc",
-+            "//tensorflow/core/util/tensor_bundle:naming",
-+        ],
-+    }),
-     alwayslink = 1,
- )
++    ] + if_not_android(if_not_mobile([
++        "//tensorflow/core:core_cpu",
++        "//tensorflow/core:framework",
++        "//tensorflow/core:lib",
++        "//tensorflow/core:lib_internal",
++        "//tensorflow/core:protos_all_cc",
++        "//tensorflow/core/util/tensor_bundle:naming",
++    ])) + if_android([
+         "//tensorflow/core:core_cpu",
+         "//tensorflow/core:framework",
+         "//tensorflow/core:lib",
  """
 
 
