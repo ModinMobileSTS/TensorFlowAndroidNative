@@ -1313,7 +1313,44 @@ TF_C_API_SAVED_MODEL_ANDROID_PATCH = """--- a/tensorflow/c/c_api.cc
 
 # Keep upstream SavedModel loader wiring on Android so the C API can resolve
 # TF_LoadSessionFromSavedModel() once the mobile guard above is removed.
-SAVED_MODEL_ANDROID_LOADER_PATCH = ""
+SAVED_MODEL_ANDROID_LOADER_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
++++ b/tensorflow/cc/saved_model/BUILD
+@@ -50,6 +50,9 @@
+         # tf_lib depending on the build platform.
+         "//tensorflow/core:lib",
+         "//tensorflow/core:protos_all_cc",
++    ]) + if_android([
++        "//tensorflow/core:lib",
++        "//tensorflow/core:protos_all_cc",
+     ]),
+ )
+
+@@ -98,6 +101,10 @@
+         "//tensorflow/core:core_cpu",
+         "//tensorflow/core:lib",
+         "//tensorflow/core:protos_all_cc",
++    ]) + if_android([
++        "//tensorflow/core:core_cpu",
++        "//tensorflow/core:lib",
++        "//tensorflow/core:protos_all_cc",
+     ]),
+ )
+
+@@ -109,6 +116,13 @@
+         ":constants",
+         ":reader",
+     ] + if_not_mobile([
++        "//tensorflow/core:core_cpu",
++        "//tensorflow/core:framework",
++        "//tensorflow/core:lib",
++        "//tensorflow/core:lib_internal",
++        "//tensorflow/core:protos_all_cc",
++        "//tensorflow/core/util/tensor_bundle:naming",
++    ]) + if_android([
+         "//tensorflow/core:core_cpu",
+         "//tensorflow/core:framework",
+         "//tensorflow/core:lib",
+"""
 
 
 # Keep upstream tensorflow_framework deps on Android so loader_lite_impl stays
