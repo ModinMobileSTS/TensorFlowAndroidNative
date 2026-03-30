@@ -930,6 +930,7 @@ TF_C_BUILD_ANDROID_FULL_DEPS_PATCH = """--- a/tensorflow/c/BUILD
 +            ":tf_status",
 +            ":tf_tensor",
 +            "@com_google_absl//absl/strings",
++            "//tensorflow/cc/saved_model:loader",
 +            "//tensorflow/cc/saved_model:loader_lite",
 +            "//tensorflow/cc:gradients",
 +            "//tensorflow/cc:ops",
