@@ -1293,6 +1293,26 @@ TF_C_API_EXPERIMENTAL_CC_PATCH = """--- a/tensorflow/c/c_api_experimental.cc
 """
 
 
+TF_C_API_SAVED_MODEL_INCLUDE_PATCH = """--- a/tensorflow/c/c_api.cc
++++ b/tensorflow/c/c_api.cc
+@@ -29,11 +29,13 @@ limitations under the License.
+ #include "tensorflow/cc/framework/ops.h"
+ #include "tensorflow/cc/framework/scope_internal.h"
+ #include "tensorflow/cc/ops/while_loop.h"
+-#include "tensorflow/cc/saved_model/loader.h"
+ #include "tensorflow/core/distributed_runtime/server_lib.h"
+ #include "tensorflow/core/framework/logging.h"
+ #include "tensorflow/core/framework/op_gen_lib.h"
+ #endif  // !defined(IS_MOBILE_PLATFORM) && !defined(IS_SLIM_BUILD)
++#if !defined(IS_SLIM_BUILD)
++#include "tensorflow/cc/saved_model/loader.h"
++#endif  // !defined(IS_SLIM_BUILD)
+ #include "tensorflow/c/c_api_internal.h"
+ #include "tensorflow/c/tf_status_internal.h"
+ #include "tensorflow/c/tf_tensor.h"
+"""
+
+
 TF_C_API_SAVED_MODEL_ANDROID_PATCH = """--- a/tensorflow/c/c_api.cc
 +++ b/tensorflow/c/c_api.cc
 @@ -2189,11 +2189,11 @@
@@ -1520,6 +1540,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += GRPC_SERVER_LIB_ANDROID_BUILD_PATCH
     text += GRPC_SERVER_LIB_ANDROID_CC_PATCH
     text += TF_C_API_EXPERIMENTAL_CC_PATCH
+    text += TF_C_API_SAVED_MODEL_INCLUDE_PATCH
     text += TF_C_API_SAVED_MODEL_ANDROID_PATCH
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH

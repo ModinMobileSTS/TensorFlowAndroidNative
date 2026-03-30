@@ -171,6 +171,7 @@ def main() -> int:
 
     start = time.monotonic()
     announced_waiting_for_run = False
+    last_error: str | None = None
     last_status: str | None = None
     target_run_id = args.run_id
 
@@ -180,32 +181,42 @@ def main() -> int:
             return 124
 
         run: dict[str, Any] | None
-        if target_run_id is not None:
-            run = fetch_run_by_id(args.repo, target_run_id)
-        else:
-            run = find_matching_run(
-                args.repo,
-                commit=args.commit,
-                branch=args.branch,
-                workflow=args.workflow,
-                event=args.event,
-            )
-            if run is None:
-                if not announced_waiting_for_run:
-                    print(
-                        "waiting for matching run: repo={repo} commit={commit} branch={branch} workflow={workflow} event={event}".format(
-                            repo=args.repo,
-                            commit=args.commit or "",
-                            branch=args.branch or "",
-                            workflow=args.workflow or "",
-                            event=args.event or "",
-                        ),
-                        flush=True,
-                    )
-                    announced_waiting_for_run = True
-                time.sleep(args.interval)
-                continue
-            target_run_id = int(run["databaseId"])
+        try:
+            if target_run_id is not None:
+                run = fetch_run_by_id(args.repo, target_run_id)
+            else:
+                run = find_matching_run(
+                    args.repo,
+                    commit=args.commit,
+                    branch=args.branch,
+                    workflow=args.workflow,
+                    event=args.event,
+                )
+                if run is None:
+                    if not announced_waiting_for_run:
+                        print(
+                            "waiting for matching run: repo={repo} commit={commit} branch={branch} workflow={workflow} event={event}".format(
+                                repo=args.repo,
+                                commit=args.commit or "",
+                                branch=args.branch or "",
+                                workflow=args.workflow or "",
+                                event=args.event or "",
+                            ),
+                            flush=True,
+                        )
+                        announced_waiting_for_run = True
+                    time.sleep(args.interval)
+                    continue
+                target_run_id = int(run["databaseId"])
+        except RuntimeError as exc:
+            message = str(exc)
+            if message != last_error:
+                print(f"transient gh error, retrying: {message}", file=sys.stderr, flush=True)
+                last_error = message
+            time.sleep(args.interval)
+            continue
+
+        last_error = None
 
         status = run["status"]
         if status != last_status:
