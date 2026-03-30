@@ -1293,46 +1293,32 @@ TF_C_API_EXPERIMENTAL_CC_PATCH = """--- a/tensorflow/c/c_api_experimental.cc
 """
 
 
-SAVED_MODEL_ANDROID_LOADER_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
-+++ b/tensorflow/cc/saved_model/BUILD
-@@ -92,7 +92,7 @@
- cc_library(
-     name = "loader_lite",
-     hdrs = ["loader.h"],
--    deps = if_static([
-+    deps = if_static_and_not_mobile([
-         ":loader_lite_impl",
-     ]) + if_not_mobile([
-         "//tensorflow/core:core_cpu",
+TF_C_API_SAVED_MODEL_ANDROID_PATCH = """--- a/tensorflow/c/c_api.cc
++++ b/tensorflow/c/c_api.cc
+@@ -2189,11 +2189,11 @@
+     TF_Graph* graph, TF_Buffer* meta_graph_def, TF_Status* status) {
+ // TODO(sjr): Remove the IS_MOBILE_PLATFORM guard. This will require ensuring
+ // that the tensorflow/cc/saved_model:loader build target is mobile friendly.
+-#if defined(IS_MOBILE_PLATFORM) || defined(IS_SLIM_BUILD)
++#if defined(IS_SLIM_BUILD)
+   status->status = tensorflow::errors::Unimplemented(
+       "Loading a SavedModel is not supported on mobile. File a bug at "
+       "https://github.com/tensorflow/tensorflow/issues if this feature is "
+       "important to you");
+   return nullptr;
+ #else
+   mutex_lock l(graph->mu);
 """
 
 
-TENSORFLOW_FRAMEWORK_ANDROID_PATCH = """--- a/tensorflow/BUILD
-+++ b/tensorflow/BUILD
-@@ -635,8 +635,12 @@
-     per_os_targets = True,
-     soversion = VERSION,
-     visibility = ["//visibility:public"],
--    deps = [
--        "//tensorflow/cc/saved_model:loader_lite_impl",
-+    deps = select({
-+        "//tensorflow:android": [],
-+        "//conditions:default": [
-+            "//tensorflow/cc/saved_model:loader_lite_impl",
-+        ],
-+    }) + [
-         "//tensorflow/core:core_cpu_impl",
-         "//tensorflow/core:framework_internal_impl",
-         "//tensorflow/core:gpu_runtime_impl",
-         "//tensorflow/core/grappler/optimizers:custom_graph_optimizer_registry_impl",
-         "//tensorflow/core:lib_internal_impl",
-         "//tensorflow/core/profiler:profiler_impl",
-         "//tensorflow/stream_executor:stream_executor_impl",
-         "//tensorflow:tf_framework_version_script.lds",
--    ] + tf_additional_binary_deps(),
-+    ] + tf_additional_binary_deps(),
- )
-"""
+# Keep upstream SavedModel loader wiring on Android so the C API can resolve
+# TF_LoadSessionFromSavedModel() once the mobile guard above is removed.
+SAVED_MODEL_ANDROID_LOADER_PATCH = ""
+
+
+# Keep upstream tensorflow_framework deps on Android so loader_lite_impl stays
+# bundled into libtensorflow_framework.so.
+TENSORFLOW_FRAMEWORK_ANDROID_PATCH = ""
 
 
 ANDROID_PORTABLE_LIB_SHIM_PATCH = """--- a/tensorflow/core/BUILD
@@ -1484,6 +1470,7 @@ def write_tensorflow_android_absl_patch(path: Path) -> None:
     text += GRPC_SERVER_LIB_ANDROID_BUILD_PATCH
     text += GRPC_SERVER_LIB_ANDROID_CC_PATCH
     text += TF_C_API_EXPERIMENTAL_CC_PATCH
+    text += TF_C_API_SAVED_MODEL_ANDROID_PATCH
     text += SAVED_MODEL_ANDROID_LOADER_PATCH
     text += TENSORFLOW_FRAMEWORK_ANDROID_PATCH
     text += normalize_unified_diff_hunk_counts(ANDROID_PORTABLE_LIB_SHIM_PATCH)
