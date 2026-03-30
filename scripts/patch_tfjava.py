@@ -61,7 +61,7 @@ if [[ "${PLATFORM:-}" == "android-arm64" ]]; then
     printf 'INPUT(-lc)\\n' > "${TF_ANDROID_COMPAT_LIB_DIR}/librt.so"
     # tfjava builds TensorFlow as an external Bazel repository, so TensorFlow's
     # own .bazelrc does not inject framework_shared_object=true for us.
-    export BUILD_FLAGS="--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog"
+    export BUILD_FLAGS="--config=android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain --define=framework_shared_object=true --copt=-DANDROID --copt=-DSUPPORT_SELECTIVE_REGISTRATION --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 --cxxopt=-include --cxxopt=cstdint --host_cxxopt=-include --host_cxxopt=cstdint --copt=-Wno-error=array-parameter --host_copt=-Wno-error=array-parameter --copt=-Wno-error=array-bounds --host_copt=-Wno-error=array-bounds --linkopt=-L${TF_ANDROID_COMPAT_LIB_DIR} --linkopt=-llog"
     export PYTHON_BIN_PATH=$(which python3)
 elif [[ -d $BAZEL_VC ]]; then
     # Work around compiler issues on Windows documented mainly in configure.py but also elsewhere
