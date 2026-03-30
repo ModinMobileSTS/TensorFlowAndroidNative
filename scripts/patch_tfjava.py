@@ -1315,42 +1315,93 @@ TF_C_API_SAVED_MODEL_ANDROID_PATCH = """--- a/tensorflow/c/c_api.cc
 # TF_LoadSessionFromSavedModel() once the mobile guard above is removed.
 SAVED_MODEL_ANDROID_LOADER_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
 +++ b/tensorflow/cc/saved_model/BUILD
-@@ -50,6 +50,9 @@
-         # tf_lib depending on the build platform.
-         "//tensorflow/core:lib",
-         "//tensorflow/core:protos_all_cc",
-+    ]) + if_android([
-+        "//tensorflow/core:lib",
-+        "//tensorflow/core:protos_all_cc",
-     ]),
+@@ -44,13 +44,20 @@
+     name = "reader",
+     srcs = ["reader.cc"],
+     hdrs = ["reader.h"],
+-    deps = [":constants"] + if_not_mobile([
+-        # TODO(b/111634734): :lib and :protos_all contain dependencies that
+-        # cannot be built on mobile platforms. Instead, include the appropriate
+-        # tf_lib depending on the build platform.
+-        "//tensorflow/core:lib",
+-        "//tensorflow/core:protos_all_cc",
+-    ]),
++    deps = [":constants"] + select({
++        "//tensorflow:android": [
++            "//tensorflow/core:lib",
++            "//tensorflow/core:protos_all_cc",
++        ],
++        "//tensorflow:mobile": [],
++        "//conditions:default": [
++            # TODO(b/111634734): :lib and :protos_all contain dependencies that
++            # cannot be built on mobile platforms. Instead, include the appropriate
++            # tf_lib depending on the build platform.
++            "//tensorflow/core:lib",
++            "//tensorflow/core:protos_all_cc",
++        ],
++    }),
  )
-
-@@ -98,6 +101,10 @@
-         "//tensorflow/core:core_cpu",
-         "//tensorflow/core:lib",
-         "//tensorflow/core:protos_all_cc",
-+    ]) + if_android([
-+        "//tensorflow/core:core_cpu",
-+        "//tensorflow/core:lib",
-+        "//tensorflow/core:protos_all_cc",
-     ]),
+ 
+ tf_cc_test(
+@@ -94,11 +101,19 @@
+     hdrs = ["loader.h"],
+     deps = if_static([
+         ":loader_lite_impl",
+-    ]) + if_not_mobile([
+-        "//tensorflow/core:core_cpu",
+-        "//tensorflow/core:lib",
+-        "//tensorflow/core:protos_all_cc",
+-    ]),
++    ]) + select({
++        "//tensorflow:android": [
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:protos_all_cc",
++        ],
++        "//tensorflow:mobile": [],
++        "//conditions:default": [
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:protos_all_cc",
++        ],
++    }),
  )
-
-@@ -109,6 +116,13 @@
+ 
+ cc_library(
+@@ -108,14 +123,25 @@
+     deps = [
          ":constants",
          ":reader",
-     ] + if_not_mobile([
-+        "//tensorflow/core:core_cpu",
-+        "//tensorflow/core:framework",
-+        "//tensorflow/core:lib",
-+        "//tensorflow/core:lib_internal",
-+        "//tensorflow/core:protos_all_cc",
-+        "//tensorflow/core/util/tensor_bundle:naming",
-+    ]) + if_android([
-         "//tensorflow/core:core_cpu",
-         "//tensorflow/core:framework",
-         "//tensorflow/core:lib",
-"""
+-    ] + if_not_mobile([
+-        "//tensorflow/core:core_cpu",
+-        "//tensorflow/core:framework",
+-        "//tensorflow/core:lib",
+-        "//tensorflow/core:lib_internal",
+-        "//tensorflow/core:protos_all_cc",
+-        "//tensorflow/core/util/tensor_bundle:naming",
+-    ]),
++    ] + select({
++        "//tensorflow:android": [
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++            "//tensorflow/core/util/tensor_bundle:naming",
++        ],
++        "//tensorflow:mobile": [],
++        "//conditions:default": [
++            "//tensorflow/core:core_cpu",
++            "//tensorflow/core:framework",
++            "//tensorflow/core:lib",
++            "//tensorflow/core:lib_internal",
++            "//tensorflow/core:protos_all_cc",
++            "//tensorflow/core/util/tensor_bundle:naming",
++        ],
++    }),
+     alwayslink = 1,
+ )
+ """
 
 
 # Keep upstream tensorflow_framework deps on Android so loader_lite_impl stays
