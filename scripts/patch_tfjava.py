@@ -1362,6 +1362,7 @@ SAVED_MODEL_ANDROID_LOADER_PATCH = """--- a/tensorflow/cc/saved_model/BUILD
 +    ],
      alwayslink = 1,
  )
+ 
 """
 
 
