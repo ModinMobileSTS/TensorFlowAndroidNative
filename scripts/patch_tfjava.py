@@ -920,6 +920,20 @@ TF_C_BUILD_ANDROID_FULL_DEPS_PATCH = """--- a/tensorflow/c/BUILD
          "//conditions:default": [
              ":tf_attrtype",
              "//tensorflow/core:core_cpu",
+@@ -149,10 +154,15 @@ tf_cuda_library(
+     srcs = [
+         "c_api.cc",
+         "c_api_function.cc",
+-    ],
++    ] + select({
++        "//tensorflow:android": ["//tensorflow/cc/saved_model:loader.h"],
++        "//conditions:default": [],
++    }),
+     hdrs = [
+         "c_api.h",
+     ],
+     copts = tf_copts(),
+     visibility = ["//tensorflow/c:__subpackages__"],
 @@ -162,7 +167,23 @@ tf_cuda_library(
          ":tf_status_internal",
      ] + select({
